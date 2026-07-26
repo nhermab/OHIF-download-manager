@@ -17,7 +17,7 @@
 
 The **OHIF Download Manager** is a medical-grade browser extension engineered for the OHIF (Open Health Imaging Foundation) v3 Viewer platform. Developed at **UZ Leuven** by medical imaging engineers in the Information Technology and Data Department (PACS, eHealth HUB and Telematics team), this extension bridges clinical medical imaging viewer workflows with research data governance, enabling clinicians, researchers, and PACS administrators to filter, batch export, package, and anonymize DICOM imaging datasets directly within client-side browser sessions.
 
-The extension executes **100% client-side**, eliminating external server dependencies or third-party cloud uploads. It features high-performance streaming ZIP writers, WebAssembly-based DICOM frame transcoding, optical character recognition (OCR) with Stroke-Width Transform (SWT) anatomical topology filtering for pixel redaction, and strict compliance with the **DICOM PS 3.15 Annex E Basic Application Level Confidentiality Profile** including full de-identification audit provenance injection.
+The extension executes **100% client-side**, eliminating external server dependencies or third-party cloud uploads. It features high-performance streaming ZIP writers, WebAssembly-based DICOM frame transcoding, optical character recognition (OCR) with Stroke-Width Transform (SWT) anatomical topology filtering for pixel redaction, and strict compliance with the **[DICOM PS 3.15 Annex E Basic Application Level Confidentiality Profile](https://dicom.nema.org/medical/dicom/current/output/chtml/part15/chapter_E.html)** including full de-identification audit provenance injection.
 
 ---
 
@@ -29,7 +29,7 @@ The extension executes **100% client-side**, eliminating external server depende
 - **Pre-flight Dataset Validation**: Pre-checks all requested DICOM SOP Instances for mandatory UIDs, accessibility, and parseability prior to download, preventing incomplete exports.
 
 ### 2. DICOM PS 3.15 Header Anonymization & Provenance Injection
-- **DICOM Standard Profile Compliance**: Implements tag modification rules based on **DICOM PS 3.15 Annex E (Basic Application Level Confidentiality Profile)**.
+- **DICOM Standard Profile Compliance**: Implements tag modification rules based on **[DICOM PS 3.15 Annex E (Basic Application Level Confidentiality Profile)](https://dicom.nema.org/medical/dicom/current/output/chtml/part15/chapter_E.html)**.
 - **Granular Tag Rules Engine**: Configurable handling (`KEEP`, `REMOVE`, `CLEAN`, `REPLACE`, `HASH`, `DUMMY`) across Patient, Study, Series, Equipment, Institution, and Physician identity tags.
 - **De-identification Audit Provenance (PS 3.15 Annex E)**: Injects standard compliance metadata into exported DICOM headers:
   - `PatientIdentityRemoved (0012,0062)`: Set to `"YES"`
@@ -38,7 +38,7 @@ The extension executes **100% client-side**, eliminating external server depende
   - `ContributingEquipmentSequence (0018,A001)`: Complete equipment provenance log recording de-identification software identity and timestamp.
 
 ### 3. Optical & Topological Pixel Redaction Engine
-- **Micro-OCR Text Detection**: Embedded glyph segmentation engine (`src/ocr-engine.js`) recognizing patient demographic annotations across diverse medical fonts, orientations, and contrast levels.
+- **Micro-OCR Text Detection**: Embedded glyph segmentation engine ([`src/ocr-engine.js`](./src/ocr-engine.js)) recognizing patient demographic annotations across diverse medical fonts, orientations, and contrast levels.
 - **Stroke-Width Transform (SWT) & Edge Topology Filter**: Uses SWT variance analysis to distinguish character text strokes from high-contrast anatomical edges (e.g., diaphragmatic contours, surgical clips, cortical bone borders, ECG leads), preventing false-positive anatomical blackouts.
 - **RSNA PHI vs. Clinical Measurement Classifier**: Disambiguates sensitive Protected Health Information (PHI) from vital diagnostic graphics (e.g., millimeter calipers, ROI HU values, angle measurements).
 - **Sequential Multi-Frame Scan Verification**: Evaluates multi-frame cine loops sequentially (`multiFrameRedactionMethod: "aggressive"`) to ensure no un-scanned intermediate frames escape redaction. Fail-closed semantics ensure `BurnedInAnnotation (0028,0301)` is set to `"NO"` only when pixel redaction is independently verified clean.
@@ -95,8 +95,8 @@ extensions/download-manager/
 │   │   └── folderWriter.js        # Native File System Access API writer
 │   └── components/                # React UI components (AnonymizerPanel, ModalityFilter, etc.)
 ├── docs/                          # Comprehensive user & technical documentation suite
-├── TODO.md                        # Medical software quality matrix & enhancement roadmap
-├── SHORTCOMINGS.md                # Safety audit log & technical boundary reference
+├── [TODO.md](./TODO.md)                        # Medical software quality matrix & enhancement roadmap
+├── [SHORTCOMINGS.md](./SHORTCOMINGS.md)                # Safety audit log & technical boundary reference
 ├── package.json                   # Package manifest & dependencies
 └── README.md                      # Primary technical & scientific README
 ```
@@ -177,11 +177,17 @@ yarn build
 
 ---
 
-## License & Third-Party Acknowledgments
+## License & Limitation of Liability
 
-Licensed under the **MIT License**. See [LICENSE](file:///C:/System9/dnaPacs/ohif-viewers/extensions/download-manager/LICENSE) for details.
+Licensed under the **MIT License**. See [LICENSE](./LICENSE) for full details.
+
+### Disclaimer of Warranty & Limitation of Liability
+> **NOTICE**: This software and documentation are provided **"AS IS"**, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. 
+> 
+> IN NO EVENT SHALL THE AUTHOR (**NICK HERMANS**), **UZ LEUVEN** (UNIVERSITY HOSPITALS LEUVEN), OR ANY CONTRIBUTORS / COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, DATA LOSS, PRIVACY BREACH, REGULATORY NON-COMPLIANCE, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### Third-Party Engineering Credits
 - **DicomCleaner™ / PixelMed Toolkit** (BSD License) — Tag anonymization rules structure.
 - **RSNA MIRC Anonymizer / CTP** (Open Source) — De-identification profile references.
 - **Cornerstone3D & WebAssembly DICOM Codecs** — In-browser image decoding & transcoding.
+

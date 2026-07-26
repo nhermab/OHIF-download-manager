@@ -1,28 +1,31 @@
 # 02. Dataset Selection & Filtering Guide
 
-> **Safety notice:** selected files are identified data. This extension does not
-> de-identify DICOM or verify clean pixel data.
+> **Author**: **Nick Hermans** (Medical Imaging Engineer, UZ Leuven — Information Technology and Data Department, PACS, eHealth HUB and Telematics team) — [`nick.hermans@uzleuven.be`](mailto:nick.hermans@uzleuven.be)  
+> **Package**: `@ohif/extension-download-manager` (OHIF Viewer v3 Platform)
 
-This document details how the Download Manager extracts study metadata from the OHIF Viewer context, filters series by modality and study, computes export manifests, and handles missing or non-standard DICOM objects.
+---
+
+This document details how the Download Manager extracts study metadata from the OHIF Viewer context, filters series by imaging modality and study, validates DICOM SOP instances, and constructs pre-flight export manifests.
 
 ---
 
 ## 1. Study Context & Data Payload
 
-When the Download Manager opens, it reads the active viewer state from OHIF's `DisplaySetService` and `DicomMetadataStore`. The dataset payload includes:
+When launched, the Download Manager inspects the active viewer state through OHIF's `DisplaySetService` and `DicomMetadataStore`. It aggregates all patient studies currently loaded into the active viewport session.
 
-- All studies currently loaded in the viewer session (including multi-study comparison views).
-- Series level metadata (Series Description, Series Number, Modality, SOP Class UID, instance count).
-- SOP Instance UIDs and raw DICOMweb retrieve URLs (WADO-RS / bulk data endpoints).
+### Context Extraction
+- **Multi-Study & Multi-Series Scoping**: Captures single studies as well as multi-study comparison sessions (e.g. prior vs. current follow-up scans).
+- **Series Metadata**: Parses Series Description, Series Number, Modality, SOP Class UID, and instance counts.
+- **DICOMweb Endpoint Mapping**: Maps SOP Instance UIDs to their raw DICOMweb retrieve URLs (WADO-RS / bulk data endpoints) using active session authorization tokens.
 
 ![Figure 2.1: Dataset Scoping and Loaded Studies Panel](placeholder_dataset_studies_panel.png)  
-*Figure 2.1: Study browser panel showing loaded multi-study datasets ready for download scoping.*
+*Figure 2.1: Study selection tree showing loaded multi-study datasets ready for download scoping.*
 
 ---
 
-## 2. Modality Filtering
+## 2. Modality Quick-Filtering
 
-Medical imaging datasets frequently contain auxiliary or secondary series (e.g., dose reports, structured reports, key object selections, or secondary captures) alongside primary volumetric cross-sectional images. The Download Manager provides modality filtering to isolate relevant imaging data quickly.
+Medical imaging datasets frequently contain auxiliary or non-image series (such as dose reports, structured reports, presentation states, or secondary captures) alongside primary volumetric scans. The Download Manager provides modality quick-filters to isolate target series immediately.
 
 ![Figure 2.2: Modality Filter Selection Controls](placeholder_modality_filters.png)  
 *Figure 2.2: Quick-filter buttons dynamically generated from available modalities in the loaded dataset.*
@@ -30,71 +33,71 @@ Medical imaging datasets frequently contain auxiliary or secondary series (e.g.,
 ### Supported Modalities
 The system inspects every series and categorizes it based on DICOM Modality (`0008,0600`) or SOP Class UID (`0008,0016`):
 
-| Modality Code | Description | Typical Use Case |
+| Modality Code | Description | Typical Content |
 | :--- | :--- | :--- |
-| **CT** | Computed Tomography | Cross-sectional volumetric scans |
-| **MR** | Magnetic Resonance | Cross-sectional anatomical & functional scans |
-| **PT / PET** | Positron Emission Tomography | Nuclear medicine molecular imaging |
-| **US** | Ultrasound | Dynamic 2D/3D acoustic imaging |
+| **CT** | Computed Tomography | Cross-sectional volumetric image series |
+| **MR** | Magnetic Resonance | Anatomical, functional, and spectroscopic series |
+| **PT / PET** | Positron Emission Tomography | Molecular nuclear medicine scans |
+| **US** | Ultrasound | 2D/3D acoustic image series and Doppler loops |
 | **CR / DX** | Computed / Digital Radiography | Projection X-ray images |
-| **MG** | Mammography | Breast X-ray imaging |
-| **SR** | Structured Report | Radiation dose summary, CAD findings, measurements |
-| **SEG** | Segmentation Object | 3D binary/fractional tissue segmentations |
+| **MG** | Mammography | Breast projection and tomosynthesis images |
+| **SR** | Structured Report | Radiation dose summaries, CAD findings, measurements |
+| **SEG** | Segmentation Object | 3D binary and fractional tissue segmentations |
+| **RTSTRUCT** | Radiotherapy Structure Set | Contour overlays and treatment planning volumes |
 | **PR** | Softcopy Presentation State | Display annotations, window level presets, ROIs |
-| **DOC / OT** | Encapsulated PDF / Other | Scanned reports, clinical documents |
+| **DOC / OT** | Encapsulated PDF / Other | Scanned reports and clinical documents |
 
 ### Filter Operations
-* **Single Modality Toggle**: Clicking a modality button (e.g., `CT`) isolates the selection to CT series only.
-* **Filter Toggle Off**: Clicking the active modality button again clears the filter and selects all series.
-* **Multi-Study Isolation**: Clicking a study header selects all series within that specific study while ignoring others.
+* **Modality Toggle**: Clicking a modality button (e.g. `CT`) filters the selection tree to show only series matching that modality.
+* **Toggle Off**: Clicking an active modality button again clears the filter and restores full series visibility.
+* **Study Isolation**: Clicking a study header selects or deselects all series belonging to that specific study.
 
 ---
 
-## 3. Series List & Selection Controls
+## 3. Series Selection Controls
 
-The **Series Selection Panel** renders a detailed hierarchical list of all available series grouped by study:
+The **Series Selection Panel** renders a detailed hierarchical tree of all available series grouped by study:
 
 ![Figure 2.3: Series List View with Checkboxes and Metadata](placeholder_series_list_view.png)  
-*Figure 2.3: Detailed series list view displaying Series Description, Series Number, Modality badge, and Instance Count.*
+*Figure 2.3: Series list view displaying Series Description, Series Number, Modality badge, and Instance Count.*
 
 ### Selection Actions
 * **Select All**: Selects 100% of available series across all loaded studies.
-* **Clear Selection**: Deselects all series (Export button becomes disabled).
+* **Clear Selection**: Deselects all series (the Export action is disabled until at least one series is selected).
 * **Per-Series Checkbox**: Toggles individual series inclusion.
-* **Study Header Select**: Selects all series belonging to a specific Patient/Study.
+* **Study Checkbox**: Selects or deselects all series under a specific study.
 
 ---
 
-## 4. Manifest Construction & Validation
+## 4. Pre-flight Validation & Manifest Construction
 
-Before download execution, the system passes selected series through `buildManifest()`. This process normalizes metadata, generates destination paths, and validates instance integrity.
+Before download execution, selected series are processed through `buildManifest()` in `src/manifest.js`. This function normalizes metadata, generates OS-safe neutral directory paths, and pre-validates SOP instances.
 
 ```text
 Selected Series
      │
      ▼
-flattenSeries() ──► Extracts SOP Instances
+flattenSeries() ──► Extracts SOP Instance UIDs & WADO-RS URLs
      │
      ▼
-buildManifest() ──► Validates SOPInstanceUID
-     │              Generates Directory Hierarchy
-     │              Sanitizes Path Characters
-     │              Caps String Lengths (120 chars)
+buildManifest() ──► Validates SOPInstanceUID (Quarantines invalid items)
+     │              Generates Neutral Directory Hierarchy
+     │              Sanitizes Path Characters & Caps Segment Lengths
      ▼
-Final Download Manifest Queue
+Final Download Queue & Manifest
 ```
 
-### Missing SOP Instance UID Quarantine
-If a DICOM instance returned by the PACS server lacks a valid `SOPInstanceUID` (`0008,0018`), the item is automatically **quarantined and excluded** from the manifest. A warning entry is written to the download log.
+### SOP Instance Quarantine
+If a DICOM instance returned by PACS metadata lacks a valid `SOPInstanceUID` (`0008,0018`), the item is automatically **quarantined and excluded** from the manifest queue to prevent broken exports. A diagnostic entry is written to `export-manifest.json`.
 
-### Dynamic File & Byte Count Estimation
-As selection state changes, the footer dynamically displays:
-- **Total Selected Series**: e.g., `4 of 6 series`.
-- **Total File Count**: Computed by summing valid SOP instances across selected series.
-- **Estimated Size**: Calculated using image dimensions (`Rows * Columns * SamplesPerPixel * (BitsAllocated / 8) * NumberOfFrames`) or actual bulk metadata byte flags when available.
+### Dynamic Estimation
+As selection state changes, the interface footer dynamically calculates:
+- **Selected Series**: e.g., `4 of 6 series`.
+- **Total Instance Count**: Calculated by summing valid SOP instances across all selected series.
+- **Estimated Size**: Computed using image frame attributes (`Rows * Columns * SamplesPerPixel * (BitsAllocated / 8) * NumberOfFrames`) or actual byte header tags when reported by DICOMweb.
 
 ---
 
 ## Next Steps
 
-- Proceed to **[03. DICOM Metadata Anonymization](./03-metadata-anonymization.md)** to configure DICOM header tag cleaning and privacy presets.
+- Proceed to **[03. DICOM Metadata Anonymization](./03-metadata-anonymization.md)** to configure header tag cleaning and privacy presets.

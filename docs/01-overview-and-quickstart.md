@@ -11,22 +11,22 @@ This guide introduces the OHIF Viewer Download Manager, explaining its core arch
 
 ## 1. Executive Overview
 
-The **OHIF Download Manager** enables clinical researchers and medical staff to export DICOM datasets and derivative objects directly from the OHIF Viewer. 
+The **OHIF Download Manager** is a medical-grade browser extension engineered for the OHIF Viewer v3 platform. Developed at UZ Leuven by medical imaging engineers, it bridges clinical viewer workflows with research data governance, enabling clinicians, researchers, and PACS administrators to filter, batch export, package, and anonymize DICOM imaging datasets directly within client-side browser sessions.
 
 ### Key Characteristics
-* **100% Client-Side Execution**: All network operations, DICOM tag modifications, pixel parsing, and file archiving occur locally within the browser. No imaging data or DICOM metadata is sent to third-party cloud servers or external processing backends.
+* **100% Client-Side Execution**: All network operations, DICOM tag modifications, pixel parsing, and file archiving occur locally within the browser. No imaging data or DICOM metadata is sent to third-party cloud servers.
 * **PACS Credentials Preservation**: Downloads reuse the active DICOMweb session security context and bearer authorization tokens managed by OHIF's `UserAuthenticationService`.
-* **Deterministic File Organization**: Exported files are organized into standard, OS-safe folder structures (`Patient/Study/Series/SOPInstanceUID.dcm`).
-* **Storage Flexibility**: Streams data directly to a local hard drive folder when using chromium-based browsers, or packages files into chunked `.zip` archives for other browsers.
+* **Neutral Directory Structure**: Exported files are organized into non-identifying folder structures (`dataset/Patient_<StudyUID_suffix>/Study_<StudyUID_suffix>/Series_<SeriesNumber>_<SeriesUID_suffix>/<SOPInstanceUID>.dcm`) accompanied by `export-manifest.json` and `checksums.sha256`.
+* **Storage Flexibility**: Streams data directly to a local hard drive folder using Chrome/Edge File System Access API, or packages files into chunked `.zip` archives backed by browser OPFS/IndexedDB tiered storage.
 
 ---
 
 ## 2. Launching the Download Manager
 
-The Download Manager is accessed via the OHIF Viewer primary toolbar or command panel.
+Access the Download Manager from the main OHIF Viewer interface:
 
 1. Load a patient study in the OHIF Viewer.
-2. In the top toolbar, click the **Download** icon (or press the configured hotkey / execute the `openDownloadManager` command).
+2. In the top toolbar, click the **Download** icon (or execute the `openDownloadManager` command).
 3. The **Download Manager Modal** will open over the main viewer viewport.
 
 ![Figure 1.1: OHIF Toolbar Download Button Location](placeholder_toolbar_download_button.png)  
@@ -42,10 +42,10 @@ The Download Manager interface is divided into five operational sections:
 *Figure 1.2: The primary Download Manager modal window showing study series selection and anonymization controls.*
 
 ### Key UI Elements
-1. **Header Bar**: Displays total available studies, series counts, total SOP instances, and total estimated size.
-2. **Modality Filter Bar**: Fast-filter buttons to quickly toggle series by imaging modality (e.g., `CT`, `MR`, `PT`, `US`, `SR`, `SEG`).
-3. **Series Selection Panel**: List of studies and series currently loaded in the viewer context, with individual checkboxes, study-level selection controls, and SOP instance counts.
-4. **Anonymizer Configuration Panel**: Expandable accordion box containing 5 tabbed categories for metadata tag cleaning, presets, and pixel redaction controls.
+1. **Header Bar**: Displays total available studies, series counts, total SOP instances, and total estimated download size.
+2. **Modality Quick-Filters**: Instantaneous toggle buttons to quickly filter series by DICOM modality (`CT`, `MR`, `PT`, `US`, `DX`, `CR`, `MG`, `SR`, `SEG`, `RTSTRUCT`, `XA`, `ES`, `DOC`).
+3. **Series Selection Panel**: Hierarchical list of loaded studies and series with checkboxes, study-level selection controls, and SOP instance counts.
+4. **Anonymizer Configuration Panel**: Expandable panel containing tabbed categories for metadata tag cleaning, privacy presets, vendor tag policies, and visual pixel redaction controls.
 5. **Action Footer**: Displays destination mode (Direct Folder vs. Zip Archive) and buttons for **Cancel** and **Start Export**.
 
 ---
@@ -53,19 +53,19 @@ The Download Manager interface is divided into five operational sections:
 ## 4. Step-by-Step Export Workflow
 
 ### Step 1: Scope the Dataset
-Upon opening the modal, all series from the loaded patient studies are selected by default. Use the series checkboxes or modality filter buttons to narrow down the exported series (e.g., export only thin-slice axial CT series).
+Upon opening the modal, all series from the loaded patient studies are selected by default. Use the series checkboxes or modality filter buttons to narrow down the exported series (for example, exporting only axial CT series).
 
 ### Step 2: Configure Anonymization (Optional)
-If exporting for research, teaching, or external distribution:
+If exporting for research or external sharing:
 * Check the **Anonymize DICOM metadata** checkbox.
-* Select an anonymization preset (e.g., `Full Anonymization`, `Research Profile`, `Keep Dates`) or manually adjust individual tag settings under the configuration tabs.
-* Verify if **Visual Image Text Redaction (OCR)** is required for burned-in annotations.
+* Select an anonymization preset (`Full Anonymization`, `Research Profile`, `Keep Dates`, `Minimal Anonymization`) or adjust individual tag settings under the configuration tabs.
+* Enable **Visual Image Text Redaction (OCR)** if burned-in patient demographics require pixel-level blackouts.
 
 ### Step 3: Initiate Export
 Click **Start Export**. The browser will initiate the download pipeline:
 
-* **Direct Folder Mode (Chrome / Edge / Opera)**: A system folder picker dialog will prompt you to select or create a destination directory on your computer. Once selected, files stream directly to disk.
-* **Zip Archive Mode (Firefox / Safari / Fallback)**: The browser fetches DICOM instances into memory, constructs `.zip` archive chunks (up to 700 MB per chunk by default), and triggers standard browser file downloads.
+* **Direct Folder Mode (Chrome / Edge / Opera)**: A system folder picker dialog prompts you to select a destination directory on your computer. Files stream directly to disk without holding full archives in RAM.
+* **Zip Archive Mode (Firefox / Safari / Fallback)**: The browser streams DICOM instances into tiered OPFS or IndexedDB chunk buffers, constructs `.zip` archives (up to 700 MB per chunk by default), and triggers standard browser downloads.
 
 ![Figure 1.3: Target Directory Selection Dialog](placeholder_folder_picker_dialog.png)  
 *Figure 1.3: Native OS directory selection prompt when using Direct Folder Mode.*
@@ -78,8 +78,8 @@ During export, the modal switches to the **Download Progress View**:
 
 * **Progress Bar**: Indicates completed file count versus total queued files.
 * **Metrics**: Real-time throughput (MB/s), elapsed time, estimated time remaining, and failed request counts.
-* **Activity Log**: Displays granular per-instance status, anonymization warnings, or HTTP retries.
-* **Abort Button**: Stops the download operation at any point and cleanly closes open file handles.
+* **Activity Log**: Displays granular per-instance status, anonymization notices, or network retries.
+* **Abort Button**: Stops the download operation at any point and safely cleans up open streams.
 
 ---
 
@@ -90,7 +90,8 @@ Once processing finishes, the modal displays the **Download Summary View**:
 ![Figure 1.5: Download Completion Summary Screen](placeholder_download_summary_view.png)  
 *Figure 1.5: Final summary screen displaying total saved instances, byte size, elapsed time, and error quarantine report.*
 
-* If any DICOM instances failed to fetch (e.g., network timeouts or PACS 500 errors), they will be listed in an **Error Report** with options to retry failed instances.
+* Every export generates an `export-manifest.json` manifest log and a `checksums.sha256` integrity manifest file.
+* If any DICOM instances failed to fetch (for example, network timeouts or PACS 500 errors), they will be listed in an **Error Report** with options to retry failed instances.
 * Click **Done** to close the Download Manager and return to the viewer.
 
 ---

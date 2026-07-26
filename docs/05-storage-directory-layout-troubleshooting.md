@@ -1,125 +1,128 @@
 # 05. Storage Writers, Directory Layout & Troubleshooting
 
-> **Current behavior:** exports use a single ZIP archive and non-identifying paths.
-> Direct folder writing is disabled pending transactional staging and rollback.
+> **Author**: **Nick Hermans** (Medical Imaging Engineer, UZ Leuven — Information Technology and Data Department, PACS, eHealth HUB and Telematics team) — [`nick.hermans@uzleuven.be`](mailto:nick.hermans@uzleuven.be)  
+> **Package**: `@ohif/extension-download-manager` (OHIF Viewer v3 Platform)
 
-This document details the file storage strategies, canonical directory structure formatting rules, progress monitoring metrics, and troubleshooting procedures for the OHIF Download Manager.
+---
+
+This document details storage writer strategies, canonical directory layout specifications, progress monitoring metrics, and troubleshooting procedures for the OHIF Download Manager.
 
 ---
 
 ## 1. Storage Writer Strategies
 
-The Download Manager uses two storage strategies to write exported DICOM datasets to disk depending on browser capabilities and user security permissions:
+The Download Manager uses two storage writer pipelines to save exported DICOM datasets to disk depending on browser capabilities:
 
 ![Figure 5.1: Storage Writer Selection Flow](placeholder_storage_writer_flow.png)  
-*Figure 5.1: Decision logic for choosing between Direct Folder Writer and JSZip Archive Fallback.*
+*Figure 5.1: Storage writer selection logic between Direct Folder Writer and Tiered ZIP Streaming.*
 
-### Strategy A: Direct Folder Streaming (`folderWriter.js`)
-* **Technology**: Built on the W3C **File System Access API** (`window.showDirectoryPicker`).
-* **Supported Browsers**: Google Chrome 86+, Microsoft Edge 86+, Opera 72+ (Desktop only).
+### Strategy A: Direct Folder Streaming (`src/writers/folderWriter.js`)
+* **Technology**: W3C **File System Access API** (`window.showDirectoryPicker`).
+* **Supported Browsers**: Google Chrome 86+, Microsoft Edge 86+, Opera 72+ (Desktop).
 * **Behavior**:
-  1. The browser prompts the user to grant write permission to a local directory.
-  2. As DICOM instances are fetched and anonymized, files are written and streamed directly to disk into structured subdirectories.
-  3. Memory consumption remains low regardless of total export size (RAM is freed after writing each instance).
-  4. No post-download unzipping required.
+  1. The browser prompts the user to select a destination directory on their local filesystem.
+  2. As DICOM instances are fetched, anonymized, and processed, files stream directly to disk in structured subdirectories.
+  3. Memory footprint remains minimal regardless of export size because RAM is freed after each instance is written.
+  4. No post-export `.zip` extraction is required.
 
-### Strategy B: In-Memory Zip Archive Fallback (`zipWriter.js`)
-* **Technology**: Built on `JSZip` in-memory compression stream library.
-* **Supported Browsers**: All browsers (Mozilla Firefox, Apple Safari, mobile browsers, or non-HTTPS insecure contexts).
+### Strategy B: Tiered OPFS / IndexedDB ZIP Streaming (`src/writers/zipWriter.js`)
+* **Technology**: Streaming ZIP archive writer utilizing Origin Private File System (OPFS) and IndexedDB chunk buffers.
+* **Supported Browsers**: All browsers (Mozilla Firefox, Apple Safari, mobile browsers, or non-HTTPS contexts).
 * **Behavior**:
-  1. DICOM instances are accumulated in browser memory (RAM).
-  2. Datasets are automatically partitioned into multi-volume `.zip` chunks (default: `700 MB` per zip chunk or max 60,000 entries) to prevent browser memory exhaustion.
-  3. The browser triggers standard file download prompts (e.g., `export_dataset_part1.zip`, `export_dataset_part2.zip`).
+  1. DICOM instances stream into client-side OPFS or IndexedDB chunk buffers to prevent browser heap out-of-memory (OOM) crashes during multi-gigabyte dataset packaging.
+  2. Datasets are partitioned into multi-volume `.zip` archives (default: `700 MB` per chunk or maximum 60,000 instances).
+  3. The browser triggers standard file downloads (e.g. `export_dataset_part1.zip`, `export_dataset_part2.zip`).
 
 ---
 
-## 2. Canonical Directory Layout Specification
+## 2. Neutral Directory Layout & Manifest Specification
 
-Exports follow a strict, standardized directory hierarchy across all operating systems (Windows, macOS, Linux):
+To prevent accidental Patient Health Information (PHI) exposure via filesystem directory paths, exports enforce a neutral non-identifying path hierarchy across all operating systems:
 
 ```text
 dataset/
-└── <PatientID_PatientName>/
-    └── <StudyDate>_<StudyDescription>_<AccessionNumber>/
-        └── <SeriesDescription>_<SeriesNumber>/
-            ├── <SOPInstanceUID>.dcm
+├── export-manifest.json
+├── checksums.sha256
+└── Patient_<StudyUID_suffix>/
+    └── Study_<StudyUID_suffix>/
+        └── Series_<SeriesNumber>_<SeriesUID_suffix>/
             ├── <SOPInstanceUID>.dcm
             └── ...
 ```
 
-### Component Formatting Rules
+### Path Hierarchy Components
 
-| Level | Format | Example Output | Missing Value Fallback |
+| Level | Format Pattern | Example Output | Description / Fallback |
 | :--- | :--- | :--- | :--- |
-| **Patient Directory** | `<PatientID>_<PatientName>` | `SUBJECT001_Doe_John` | `UNKNOWN_PATIENT` |
-| **Study Directory** | `<StudyDate>_<StudyDescription>_<AccessionNumber>` | `20260315_CHEST_CT_WITH_CONTRAST_ACC12345` | `UNKNOWN_DATE`, `NO_STUDY_DESCRIPTION`, `NO_ACCESSION` |
-| **Series Directory** | `<SeriesDescription>_<SeriesNumber>` | `Axial_Thin_Slice_003` | `NO_SERIES_DESCRIPTION`, `NO_SERIES_NUMBER` |
-| **Filename** | `<SOPInstanceUID>.dcm` (or `.mp4`) | `1.3.12.2.1107.5.2.32.35177.dcm` | Quarantined if missing UID |
+| **Patient Directory** | `Patient_<StudyUID_suffix>` | `Patient_38240971` | Short UID suffix derived from StudyInstanceUID. Prevents patient name/ID in path. |
+| **Study Directory** | `Study_<StudyUID_suffix>` | `Study_38240971` | Short UID suffix derived from StudyInstanceUID. |
+| **Series Directory** | `Series_<SeriesNumber>_<SeriesUID_suffix>` | `Series_003_1493322` | Zero-padded 3-digit series number and series UID suffix. |
+| **DICOM Filename** | `<SOPInstanceUID>.dcm` | `1.3.6.1.4.1.25403...dcm` | SOP Instance UID with `.dcm` extension (or `.mp4` for video). |
 
-### Sanitization & Path Rules
-1. **Invalid OS Characters**: Illegal filesystem characters (`< > : " / \ | ? *`), control characters, tabs, and null bytes are replaced with an underscore `_`.
-2. **Whitespace & Caret Collapse**: Runs of spaces and DICOM caret `^` delimiters (e.g., `Doe^John`) are converted and collapsed to a single underscore `_`.
-3. **Leading / Trailing Dots**: Trailing periods and spaces are trimmed to comply with Windows NTFS specifications.
-4. **Zero-Padded Series Number**: `SeriesNumber` is formatted as a 3-digit zero-padded string (e.g., `1` → `001`, `12` → `012`).
-5. **Study Date Standard**: `StudyDate` is strictly formatted as `YYYYMMDD`.
+### Manifest & Integrity Files
+Every export archive automatically generates two verification manifests at the root of the dataset folder:
 
-### Length Caps & Duplicate Collision Handling
-* **120-Character Cap**: To prevent Path-Too-Long errors on Windows (which enforces a 260-character total path limit), every directory component is capped at **120 characters**.
-* **Truncation Priority**: If a string exceeds 120 characters, descriptive text (`StudyDescription` or `SeriesDescription`) is truncated first to protect structural IDs (`AccessionNumber` or `SeriesNumber`).
-* **Duplicate Suffix (`_DUPxx`)**: If distinct studies or series produce identical folder strings after sanitization, a collision handler automatically appends a duplicate suffix (e.g., `_DUP02`, `_DUP03`).
+1. **`export-manifest.json`**: Structured JSON manifest recording requested SOP UIDs, exported file paths, failed items, de-identification settings, and software provenance metadata.
+2. **`checksums.sha256`**: SHA-256 cryptographic checksum list for all exported files to guarantee data integrity during transport.
+
+### Path Safety & Sanitization Rules
+1. **Invalid OS Characters**: Illegal filesystem characters (`< > : " / \ | ? *`), control characters, tabs, and null bytes are replaced with underscores (`_`).
+2. **Whitespace & Carets**: Spaces and DICOM caret `^` delimiters are collapsed to single underscores (`_`).
+3. **120-Character Segment Cap**: To prevent Path-Too-Long errors on Windows (which enforces a 260-character total path limit), every directory component is capped at **120 characters**.
+4. **Duplicate Collision Handler**: If distinct series yield identical folder names after sanitization, a collision handler automatically appends a numeric suffix (e.g. `_DUP02`).
 
 ---
 
 ## 3. Progress Tracking & Performance Metrics
 
-During export execution, the modal displays live performance metrics:
+During export, the Download Manager displays live performance metrics:
 
 ![Figure 5.2: Detailed Download Progress and Performance Metrics](placeholder_progress_metrics_detailed.png)  
 *Figure 5.2: Live monitoring interface showing completion percentage, transfer rates, elapsed time, and real-time activity log.*
 
-- **Completion Count**: Displays `Completed / Total Files` (e.g., `1,420 / 2,500 DICOMs`).
-- **Transfer Throughput**: Live megabytes per second (MB/s) fetched from PACS.
+- **Completion Count**: Displays completed versus total queued files (e.g. `1,420 / 2,500 DICOMs`).
+- **Transfer Rate**: Live throughput in megabytes per second (MB/s).
 - **Time Metrics**: Elapsed processing time and dynamic Estimated Time Remaining (ETA).
-- **Retry Monitor**: Displays current retry count for instances experiencing network glitches (`maxParallel` default: 3 worker queues).
+- **Retry Monitor**: Displays active retry counts for instances experiencing network timeouts (`maxParallel` default: 3 concurrent worker queues).
 
 ---
 
-## 4. Troubleshooting & Error Resolution
+## 4. Troubleshooting & Common Resolutions
 
-| Error Symptom / Log Message | Root Cause | Recommended Resolution |
+| Issue / Symptom | Root Cause | Recommended Resolution |
 | :--- | :--- | :--- |
-| **"Folder Writer Permission Denied"** | User cancelled or denied the browser directory permission prompt. | Click **Start Export** again and click **Allow** when Chrome/Edge requests folder access. |
-| **"Out of Memory / Zip Allocation Failed"** | Browser ran out of RAM constructing a large `.zip` archive in Zip Mode. | Switch to Chrome/Edge to use Direct Folder Mode, or lower `zipChunkBytes` in app config (e.g. to 300MB). |
-| **"HTTP 401 / 403 Unauthorized"** | The active OHIF session authentication token expired during a long export. | Refresh the OHIF Viewer browser page, re-authenticate, and restart the download. |
-| **"PACS HTTP 500 / 504 Timeout"** | The PACS/DICOMweb server failed to retrieve bulk DICOM frame data. | Check PACS server logs. The Download Manager will retry failed instances up to `retryCount` times. |
-| **"Path Too Long / File Creation Error"** | Destination directory is nested inside a deep local folder structure on Windows. | Select a target folder closer to the drive root (e.g., `C:\DICOM_Exports`). |
-| **"Encapsulated Syntax Transcode Error"** | Image frame uses compressed syntax that cannot be parsed by browser canvas. | Disable **Enable Pixel Redaction** for non-standard compressed series. |
+| **"Folder Writer Permission Denied"** | Directory picker permission prompt was cancelled or denied in Chrome/Edge. | Click **Start Export** again and select **Allow** when the browser prompts for folder access. |
+| **"Out of Memory / Zip Buffer Allocation"** | Large dataset export exceeded available browser RAM in Zip Mode. | Use Chrome or Edge for Direct Folder Mode, or decrease `zipChunkBytes` in app configuration (e.g. to 300MB). |
+| **"HTTP 401 / 403 Unauthorized"** | OHIF session authentication token expired during a long export run. | Refresh the viewer page, re-authenticate with PACS, and restart the export. |
+| **"PACS HTTP 500 / 504 Timeout"** | PACS server failed to serve a specific WADO-RS instance request. | Check PACS server availability. The Download Manager retries failed instances up to `retryCount` times. |
+| **"Path Too Long / File Creation Error"** | Destination folder is nested deeply in local Windows directory tree. | Select a target export directory closer to the drive root (e.g. `C:\DICOM_Exports`). |
 
 ---
 
-## 5. System Configuration Options
+## 5. Runtime Configuration Parameters
 
-System administrators can customize default Download Manager parameters in the main OHIF configuration file (`platform/app/public/config/default.js`):
+Default parameters can be configured in your OHIF runtime configuration file (e.g. `platform/app/public/config/default.js`):
 
 ```javascript
 window.config = {
-  // OHIF configuration...
+  // Standard OHIF configuration...
   aquestDownloadManager: {
     enabled: true,
-    maxParallel: 3,             // Maximum concurrent DICOM instance fetch requests
-    preferFolderWriter: true,   // Prefer File System Access API over Zip fallback
-    retryCount: 2,              // Network retry attempts per instance
+    maxParallel: 3,                  // Concurrent instance fetch queues
+    preferFolderWriter: true,        // Prefer File System Access API over Zip fallback
+    retryCount: 2,                   // Network retry attempts per instance
     zipChunkBytes: 700 * 1024 * 1024, // 700 MB max per zip archive chunk
-    zipMaxEntries: 60000        // Maximum DICOM instances per zip file
+    zipMaxEntries: 60000             // Maximum instances per zip chunk
   }
 };
 ```
 
 ---
 
-## Summary of Documentation Suite
+## Technical Documentation Suite
 
-This completes the 5-part user and technical documentation for the OHIF Download Manager:
+This completes the 5-part technical documentation suite for `@ohif/extension-download-manager`:
+
 1. **[01. Overview & Quickstart](./01-overview-and-quickstart.md)**
 2. **[02. Dataset Selection & Filtering](./02-dataset-selection-and-filtering.md)**
 3. **[03. DICOM Metadata Anonymization](./03-metadata-anonymization.md)**
