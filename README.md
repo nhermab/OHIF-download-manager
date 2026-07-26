@@ -38,10 +38,13 @@ git checkout $(git describe --tags $(git rev-list --tags --max-count=1))
 # 2. Clone the Download Manager extension into extensions/download-manager
 git clone https://github.com/nhermab/OHIF-download-manager.git extensions/download-manager
 
-# 3. Link the extension using OHIF CLI BEFORE yarn install
+# 3. Install dependencies across monorepo workspaces (required for CLI dependencies like commander)
+yarn install
+
+# 4. Link the extension using OHIF CLI
 yarn cli link-extension extensions/download-manager
 
-# 4. Include DownloadManager in active Mode toolbar layout (e.g. modes/basic/src/index.tsx)
+# 5. Include DownloadManager in active Mode toolbar layout (e.g. modes/basic/src/index.tsx)
 node -e '
   const fs = require("fs");
   const file = "modes/basic/src/index.tsx";
@@ -52,9 +55,6 @@ node -e '
     }
   }
 '
-
-# 5. Install dependencies across monorepo workspaces
-yarn install
 
 # 6. Launch the local OHIF Viewer instance
 yarn dev
