@@ -91,6 +91,7 @@ During export, the Download Manager displays live performance metrics:
 
 | Issue / Symptom | Root Cause | Recommended Resolution |
 | :--- | :--- | :--- |
+| **"Download Manager button not visible in toolbar"** | Extension registered in `pluginConfig.json` but `'DownloadManager'` is missing from the active Mode's `toolbarSections.primary`. | Patch `modes/basic/src/index.tsx` (or your active mode) to include `'DownloadManager'` in `toolbarSections.primary`, and run `yarn cli link-extension` *before* `yarn install`. |
 | **"Folder Writer Permission Denied"** | Directory picker permission prompt was cancelled or denied in Chrome/Edge. | Click **Start Export** again and select **Allow** when the browser prompts for folder access. |
 | **"Out of Memory / Zip Buffer Allocation"** | Large dataset export exceeded available browser RAM in Zip Mode. | Use Chrome or Edge for Direct Folder Mode, or decrease `zipChunkBytes` in app configuration (e.g. to 300MB). |
 | **"HTTP 401 / 403 Unauthorized"** | OHIF session authentication token expired during a long export run. | Refresh the viewer page, re-authenticate with PACS, and restart the export. |

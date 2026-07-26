@@ -29,7 +29,7 @@ Follow these step-by-step bash commands to check out the latest official release
 ### Bash Commands
 
 ```bash
-# 1. Clone the OHIF Viewers repository and check out the latest release tag
+# 1. Clone the OHIF Viewers repository and check out the target release tag
 git clone https://github.com/OHIF/Viewers.git ohif-viewer
 cd ohif-viewer
 git fetch --tags
@@ -38,13 +38,25 @@ git checkout $(git describe --tags $(git rev-list --tags --max-count=1))
 # 2. Clone the Download Manager extension into extensions/download-manager
 git clone https://github.com/nhermab/OHIF-download-manager.git extensions/download-manager
 
-# 3. Link and register the extension in OHIF configuration
+# 3. Link the extension using OHIF CLI BEFORE yarn install
 yarn cli link-extension extensions/download-manager
 
-# 4. Install dependencies across monorepo workspaces
+# 4. Include DownloadManager in active Mode toolbar layout (e.g. modes/basic/src/index.tsx)
+node -e '
+  const fs = require("fs");
+  const file = "modes/basic/src/index.tsx";
+  if (fs.existsSync(file)) {
+    let c = fs.readFileSync(file, "utf8");
+    if (!c.includes("DownloadManager")) {
+      fs.writeFileSync(file, c.replace("[TOOLBAR_SECTIONS.primary]: [", "[TOOLBAR_SECTIONS.primary]: [\n    \"DownloadManager\","));
+    }
+  }
+'
+
+# 5. Install dependencies across monorepo workspaces
 yarn install
 
-# 5. Launch the local OHIF Viewer instance
+# 6. Launch the local OHIF Viewer instance
 yarn dev
 ```
 
@@ -143,8 +155,7 @@ yarn install --frozen-lockfile
 ```
 
 ### Extension Registration
-In `platform/app/pluginConfig.json`:
-
+1. **Register in `platform/app/pluginConfig.json`**:
 ```json
 {
   "extensions": [
@@ -154,6 +165,26 @@ In `platform/app/pluginConfig.json`:
     }
   ]
 }
+```
+*(Running `yarn cli link-extension extensions/download-manager` automatically adds this entry).*
+
+2. **Mount Button in Mode Toolbar (`modes/basic/src/index.tsx`)**:
+In OHIF v3, extensions provide tools/commands, but **Modes** control what appears in the active viewer toolbar. Ensure `'DownloadManager'` is included in `toolbarSections.primary`:
+```typescript
+export const toolbarSections = {
+  [TOOLBAR_SECTIONS.primary]: [
+    'MeasurementTools',
+    'Zoom',
+    'Pan',
+    'TrackballRotate',
+    'WindowLevel',
+    'Capture',
+    'DownloadManager', // <-- Required for button to render in UI
+    'Layout',
+    'Crosshairs',
+    'MoreTools',
+  ],
+};
 ```
 
 ### Runtime Configuration
