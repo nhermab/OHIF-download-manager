@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * Reconstruction engine for static DICOM SOP Instances.
+ */
+
 import dcmjs from 'dcmjs';
 
 const EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1';

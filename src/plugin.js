@@ -1,4 +1,9 @@
 
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ */
+
 import { isEnabled } from "./config.js";
 import { loadLastDirectoryHandle } from "./state.js";
 import { installUi } from "./ui.js";

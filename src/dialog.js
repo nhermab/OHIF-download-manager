@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * Modal Dialog Launcher & Interface Controller for Download Manager.
+ */
+
 import { state, currentPayload } from './state.js';
 import { getDownloadAvailabilityMessage } from './ohif-state.js';
 import {

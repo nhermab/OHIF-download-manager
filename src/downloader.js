@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * DICOM Download Manager Orchestrator Engine.
+ */
+
 import { state, currentPayload, saveLastDirectoryHandle } from './state.js';
 import { config } from './config.js';
 import { FolderWriter } from './writers/folderWriter.js';

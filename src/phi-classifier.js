@@ -1,5 +1,10 @@
 /**
- * DICOM-Aware PHI Classifier for OCR Pixel Redaction (RSNA Anonymizer Standard)
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * DICOM-Aware PHI Classifier for OCR Pixel Redaction.
+ * Incorporates PHI matching patterns and classification rules derived from
+ * RSNA DICOM Anonymizer V18.0 standards (Apache-2.0).
  * Compares recognized OCR text strings against DICOM header metadata,
  * regex patterns (dates, phone numbers, emails, MRNs), PHI label adjacency,
  * and safe clinical/measurement whitelists.

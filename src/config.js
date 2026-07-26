@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * Download Manager configuration constants.
+ */
+
 import { PLUGIN_ID } from "./constants.js";
 
 export const MAX_MULTIFRAME_SELECTION_OPTIONS = 100;

@@ -21,27 +21,91 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
 THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ==============================================================================
-THIRD-PARTY ACKNOWLEDGMENTS AND COPYRIGHT NOTICES
+THIRD-PARTY ACKNOWLEDGMENTS AND LICENSE ASSIGNMENTS
 ==============================================================================
 
-This project incorporates anonymization logic, tag dictionary rules, and PHI classification schemas derived from or inspired by the following third-party software:
+This project incorporates anonymization rules, tag dictionaries, safe private tag
+definitions, and PHI classification logic derived from or inspired by third-party
+open-source projects. The component attributions and applicable licenses are:
 
-1. DicomCleaner™ / PixelMed Toolkit
-   Copyright (c) 2001-2026, David A. Clunie DBA PixelMed Publishing.
-   All rights reserved.
-   Licensed under the BSD License.
+------------------------------------------------------------------------------
+1. RSNA DICOM Anonymizer V18.0 / MIRC CTP Anonymizer
+   Copyright (c) Radiological Society of North America (RSNA)
+   License: Apache License, Version 2.0 (Apache-2.0)
+------------------------------------------------------------------------------
+Applicable Files & Modules:
+  - src/default-anonymizer.script
+  - src/anonymizer-rules.js
+  - src/anonymizer-rules.json
+  - src/rules.json
+  - src/anonymizer-config.js (script parser & rule engine)
+  - src/anonymizer.js (incorporating PS 3.15 Annex E tag rules, UID remapping, @hashdate, @remove, @uid, @acc)
+  - src/phi-classifier.js (PHI identification patterns and label adjacency rules)
 
-2. RSNA DICOM Anonymizer V18.0 / MIRC CTP Anonymizer
-   Copyright (c) Radiological Society of North America (RSNA).
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
+------------------------------------------------------------------------------
+2. DicomCleaner™ / PixelMed Toolkit
+   Copyright (c) 2001-2026 David A. Clunie DBA PixelMed Publishing
+   License: BSD 3-Clause License (BSD-3-Clause)
+------------------------------------------------------------------------------
+Applicable Files & Modules:
+  - src/safe-private-rules.js (auto-derived mechanical port of com.pixelmed.dicom.ClinicalTrialsAttributes.isSafePrivateAttribute)
+  - src/anonymizer.js (incorporating DicomCleaner safe private attribute retain/remove logic & CP 892 age rounding)
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+------------------------------------------------------------------------------
+3. OHIF Viewer Download Manager Extension / Original Contributions
+   Copyright (c) 2026 Nick Hermans (UZ Leuven)
+   License: MIT License (MIT)
+------------------------------------------------------------------------------
+Applicable Files & Modules:
+  - src/pixel-redactor.js (WASM/Canvas pixel masking & SWT topology filter)
+  - src/ocr-engine.js (Micro-OCR character recognition & bounding box extractor)
+  - src/static-dicom-reconstruction.js (SOP instance reconstruction & encapsulation)
+  - src/dicom-codecs.js (WASM transfer syntax transcoders)
+  - src/downloader.js (Download orchestration pipeline)
+  - src/manifest.js (Export manifest generator & provenance recorder)
+  - src/ohif-state.js (OHIF viewer state integration)
+  - src/dialog.js, src/ui.js, src/network.js, src/state.js, src/config.js, src/constants.js, src/id.js, src/utils.js
+  - src/folderWriter.js, src/writers/folderWriter.js (File System Access API folder writer)
+  - src/zipWriter.js, src/writers/zipWriter.js (Streaming ZIP archive writer)
+  - src/index.tsx, src/getCommandsModule.ts, src/getPanelModule.tsx, src/plugin.js, src/plugin.css
+  - src/anonymizer-tool.html
+  - src/components/* (AnonymizerPanel.tsx, DownloadManagerModal.tsx, DownloadManagerPanel.tsx, DownloadProgressView.tsx, DownloadSummaryView.tsx, SeriesList.tsx)
+  - All test files (src/*.test.js)
+  - Documentation (README.md, SHORTCOMINGS.md, docs/*)

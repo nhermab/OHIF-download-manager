@@ -1,8 +1,15 @@
-// Auto-derived (mechanical port) from PixelMed com.pixelmed.dicom.ClinicalTrialsAttributes.isSafePrivateAttribute(String,AttributeTag).
-// Each private creator maps to the (group, element-within-block) pairs PixelMed's DicomCleaner considers
-// free of patient-identifying information and therefore retains even when "remove unsafe private" is selected.
-// elementInBlock = tag element & 0x00ff (the low byte within the private block, block number stripped), rendered
-// as a 2-digit lowercase hex string.
+/**
+ * Copyright (c) 2001-2026 David A. Clunie DBA PixelMed Publishing.
+ * Ported to JavaScript for OHIF Download Manager by Nick Hermans (UZ Leuven).
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
+ * Auto-derived (mechanical port) from PixelMed
+ * com.pixelmed.dicom.ClinicalTrialsAttributes.isSafePrivateAttribute(String,AttributeTag).
+ * Each private creator maps to the (group, element-within-block) pairs PixelMed's DicomCleaner considers
+ * free of patient-identifying information and therefore retains even when "remove unsafe private" is selected.
+ * elementInBlock = tag element & 0x00ff (the low byte within the private block, block number stripped), rendered
+ * as a 2-digit lowercase hex string.
+ */
 export const safePrivateRules = {
   "ELSCINT1": {
     "00e1": { elements: ["21", "50"], ranges: [] },

@@ -1,3 +1,11 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * Configurator and rule parser for DICOM header anonymization presets,
+ * supporting RSNA MIRC CTP anonymizer script rule definitions (Apache-2.0).
+ */
+
 import { anonymizerRules } from "./anonymizer-rules.js";
 
 export const DEFAULT_ANONYMIZER_CONFIG = {

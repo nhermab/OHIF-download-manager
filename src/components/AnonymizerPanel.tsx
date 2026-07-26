@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ */
+
 import React, { useState } from 'react';
 import { Button } from '@ohif/ui-next';
 import {

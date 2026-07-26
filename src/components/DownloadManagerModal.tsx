@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ */
+
 import React, { useMemo, useState } from 'react';
 import { Button, ScrollArea } from '@ohif/ui-next';
 import { currentPayload, state as globalState } from '../state';

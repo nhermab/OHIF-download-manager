@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * UI DOM integration & action event bindings.
+ */
+
 import { state } from "./state.js";
 import { hasOhifStudyData } from "./ohif-state.js";
 import { openDialog } from "./dialog.js";

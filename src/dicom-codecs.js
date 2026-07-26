@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
  * Native WebAssembly & JavaScript DICOM Codecs for Encapsulated Pixel Data
  * Supports decoding and re-compressing/transcoding for all standard DICOM transfer syntaxes:
  * - JPEG 2000 (1.2.840.10008.1.2.4.90, 1.2.840.10008.1.2.4.91)

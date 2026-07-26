@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * File System Access API folder writer.
+ */
+
 import { fileName } from "../manifest.js";
 import { sanitize } from "../utils.js";
 

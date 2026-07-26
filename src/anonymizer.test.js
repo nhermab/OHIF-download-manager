@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ */
+
 import dcmjs from 'dcmjs';
 import { TextDecoder, TextEncoder } from 'util';
 import { webcrypto } from 'crypto';

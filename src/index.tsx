@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * OHIF Viewer Extension Entry Point for Download Manager.
+ */
+
 import { id } from './id';
 import getCommandsModule from './getCommandsModule';
 import getPanelModule from './getPanelModule';

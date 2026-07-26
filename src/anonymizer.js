@@ -1,3 +1,13 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * Core DICOM PS 3.15 Annex E header anonymization engine for OHIF Download Manager.
+ * Incorporates tag transformation semantics and rules derived from:
+ *  - RSNA DICOM Anonymizer V18.0 / MIRC CTP Anonymizer (Apache-2.0)
+ *  - DicomCleaner™ / PixelMed Toolkit (BSD-3-Clause)
+ */
+
 import { anonymizerRules } from "./anonymizer-rules.js";
 import { safePrivateRules } from "./safe-private-rules.js";
 import { redactDicomPixelData } from "./pixel-redactor.js";

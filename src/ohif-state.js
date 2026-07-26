@@ -1,9 +1,12 @@
-import { numericValue } from './utils.js';
-
 /**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
  * Interface with OHIF state services.
  * Reads study metadata from OHIF DisplaySetService.
  */
+
+import { numericValue } from './utils.js';
 
 let displaySetService;
 let userAuthenticationService;

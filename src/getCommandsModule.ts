@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ */
+
 import type { Types } from '@ohif/core';
 import DownloadManagerModal from './components/DownloadManagerModal';
 import { isEnabled } from './config';

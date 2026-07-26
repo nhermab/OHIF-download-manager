@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
  * Client-Side Optical Character Recognition (OCR) Engine & Feature Extractor
  * Runs text detection and character recognition on 8-bit RGBA ImageData.
  * Supports ONNX Runtime Web / PaddleOCR when available.

@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * Download Manager reactive state container.
+ */
+
 import { PREF_DB_NAME, PREF_DB_STORE, PREF_DB_KEY } from "./config.js";
 import { createNamedError } from "./utils.js";
 import { buildPayloadFromOhif } from "./ohif-state.js";

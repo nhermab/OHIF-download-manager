@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ */
+
 import { isRetryableError, retryAfterMs, retryDelayMs, downloadManifest } from './downloader';
 import { buildManifest } from './manifest';
 

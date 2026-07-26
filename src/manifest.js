@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * Export Manifest Builder & Software Provenance Recorder.
+ */
+
 import { MAX_MULTIFRAME_SELECTION_OPTIONS } from './config.js';
 import {
   valueOr,

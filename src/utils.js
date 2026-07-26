@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
  * Utility functions for download-manager plugin.
  * Includes formatting, sanitization, path safety, and type conversions.
  */

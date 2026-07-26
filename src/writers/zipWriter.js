@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * Streaming ZIP archive writer.
+ */
+
 import { fileName } from "../manifest.js";
 import { safeName, createNamedError, sanitize } from "../utils.js";
 import { triggerBlobDownload } from "../downloader.js";

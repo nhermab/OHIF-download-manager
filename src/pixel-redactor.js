@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
  * DICOM Stored-Pixel PHI Redactor
  * Intercepts DICOM pixel data, extracts 8-bit RGBA preview frames, runs OCR,
  * classifies PHI, and redacts identified text boxes directly in stored pixel data.

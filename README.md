@@ -216,9 +216,9 @@ Licensed under the **MIT License**. See [LICENSE](./LICENSE) for full details.
 > 
 > IN NO EVENT SHALL THE AUTHOR (**NICK HERMANS**), **UZ LEUVEN** (UNIVERSITY HOSPITALS LEUVEN), OR ANY CONTRIBUTORS / COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, DATA LOSS, PRIVACY BREACH, REGULATORY NON-COMPLIANCE, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-### Third-Party Credits
-- **DicomCleaner™ / PixelMed Toolkit** (BSD License) — Tag anonymization rules structure.
-- **RSNA DICOM Anonymizer V18.0 / MIRC CTP** (Apache License 2.0) — Tag transformation rules, PHI classification logic, and de-identification profile references.
-- **Cornerstone3D & WebAssembly DICOM Codecs** — In-browser image decoding & transcoding.
+### Third-Party Credits & Code Provenance
+- **RSNA DICOM Anonymizer V18.0 / MIRC CTP Anonymizer** (Apache License 2.0) — Applies to tag transformation rules, script definitions, and PHI classification schemas (`src/default-anonymizer.script`, `src/anonymizer-rules.js`, `src/anonymizer-rules.json`, `src/rules.json`, `src/anonymizer-config.js`, `src/anonymizer.js`, `src/phi-classifier.js`).
+- **DicomCleaner™ / PixelMed Toolkit** (BSD 3-Clause License) — Applies to safe private attribute lists and retains/removes rules (`src/safe-private-rules.js`, `src/anonymizer.js`).
+- **OHIF Download Manager Extension / Original Contributions** (MIT License) — Applies to all UI components, modal dialogs, streaming ZIP/folder writers, optical pixel redaction engine, WebAssembly transcoders, and test suites by Nick Hermans / UZ Leuven (`src/pixel-redactor.js`, `src/ocr-engine.js`, `src/downloader.js`, `src/manifest.js`, `src/components/*`, `src/writers/*`, etc.). See [LICENSE](./LICENSE) for full details.
 
 

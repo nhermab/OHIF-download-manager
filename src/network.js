@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2026 Nick Hermans (UZ Leuven)
+ * SPDX-License-Identifier: MIT
+ *
+ * Network fetch helpers & URL utilities.
+ */
+
 import { state } from "./state.js";
 import { updateButtonState } from "./ui.js";
 
