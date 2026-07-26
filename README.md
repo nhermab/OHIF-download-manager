@@ -17,6 +17,41 @@ The extension executes **100% client-side**, eliminating external server depende
 
 ---
 
+## Quickstart & Testing with Local OHIF Release
+
+Follow these step-by-step bash commands to check out the latest official release of OHIF Viewer, include the Download Manager extension, and run a local instance for testing:
+
+### Prerequisites
+- **Node.js**: `>= 18.x`
+- **Yarn**: `1.22.x` (Yarn Classic)
+- **Git**
+
+### Bash Commands
+
+```bash
+# 1. Clone the OHIF Viewers repository and check out the latest release tag
+git clone https://github.com/OHIF/Viewers.git ohif-viewer
+cd ohif-viewer
+git fetch --tags
+git checkout $(git describe --tags $(git rev-list --tags --max-count=1))
+
+# 2. Clone the Download Manager extension into extensions/download-manager
+git clone https://github.com/nhermab/OHIF-download-manager.git extensions/download-manager
+
+# 3. Link and register the extension in OHIF configuration
+yarn cli link-extension extensions/download-manager
+
+# 4. Install dependencies across monorepo workspaces
+yarn install
+
+# 5. Launch the local OHIF Viewer instance
+yarn dev
+```
+
+After starting the dev server, open your browser and navigate to **`http://localhost:3000`** to test the Download Manager within the OHIF Viewer interface.
+
+---
+
 ## Key Features & Medical Imaging Architecture
 
 ### 1. Dataset Selection, Filtering & Multi-Study Scoping
@@ -183,6 +218,7 @@ Licensed under the **MIT License**. See [LICENSE](./LICENSE) for full details.
 
 ### Third-Party Credits
 - **DicomCleaner™ / PixelMed Toolkit** (BSD License) — Tag anonymization rules structure.
-- **RSNA MIRC Anonymizer / CTP** (Open Source) — De-identification profile references.
+- **RSNA DICOM Anonymizer V18.0 / MIRC CTP** (Apache License 2.0) — Tag transformation rules, PHI classification logic, and de-identification profile references.
 - **Cornerstone3D & WebAssembly DICOM Codecs** — In-browser image decoding & transcoding.
+
 

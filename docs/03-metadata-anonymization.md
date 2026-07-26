@@ -11,7 +11,7 @@ This document describes the DICOM header anonymization engine (`src/anonymizer.j
 
 ## 1. Anonymization Architecture & Compliance Standard
 
-The metadata anonymization engine operates client-side on DICOM headers before storage writing. Tag transformation rules follow **DICOM Standard PS 3.15 Annex E (Basic Application Level Confidentiality Profile)**, drawing dictionary definitions and tag action mapping schemas from standard tools including DicomCleaner™ and RSNA MIRC Anonymizer.
+The metadata anonymization engine operates client-side on DICOM headers before storage writing. Tag transformation rules follow **DICOM Standard PS 3.15 Annex E (Basic Application Level Confidentiality Profile)**, drawing dictionary definitions and tag action mapping schemas from standard open-source tools including DicomCleaner™ (BSD License) and RSNA DICOM Anonymizer V18.0 (Apache License 2.0).
 
 ![Figure 3.1: Anonymization Engine Architecture Flow](placeholder_anonymizer_architecture.png)  
 *Figure 3.1: Sequence flow of client-side DICOM header tag parsing, replacement, UID remapping, and rule validation.*
