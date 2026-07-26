@@ -2,10 +2,6 @@
 
 > **OHIF Viewer v3 Extension for DICOM Dataset Management, Export, & Client-Side Anonymization**
 
----
-
-## Author & Engineering Attribution
-
 * **Author**: **Nick Hermans** (Medical Imaging Engineer)
 * **Institution**: **UZ Leuven** (University Hospitals Leuven, Information Technology and Data Department — PACS, eHealth HUB and Telematics team)
 * **Contact**: [`nick.hermans@uzleuven.be`](mailto:nick.hermans@uzleuven.be)
@@ -13,7 +9,7 @@
 
 ---
 
-## Executive & Scientific Summary
+## Summary
 
 The **OHIF Download Manager** is a medical-grade browser extension engineered for the OHIF (Open Health Imaging Foundation) v3 Viewer platform. Developed at **UZ Leuven** by medical imaging engineers in the Information Technology and Data Department (PACS, eHealth HUB and Telematics team), this extension bridges clinical medical imaging viewer workflows with research data governance, enabling clinicians, researchers, and PACS administrators to filter, batch export, package, and anonymize DICOM imaging datasets directly within client-side browser sessions.
 
@@ -95,7 +91,6 @@ extensions/download-manager/
 │   │   └── folderWriter.js        # Native File System Access API writer
 │   └── components/                # React UI components (AnonymizerPanel, ModalityFilter, etc.)
 ├── docs/                          # Comprehensive user & technical documentation suite
-├── [TODO.md](./TODO.md)                        # Medical software quality matrix & enhancement roadmap
 ├── [SHORTCOMINGS.md](./SHORTCOMINGS.md)                # Safety audit log & technical boundary reference
 ├── package.json                   # Package manifest & dependencies
 └── README.md                      # Primary technical & scientific README
