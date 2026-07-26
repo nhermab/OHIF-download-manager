@@ -2,7 +2,7 @@
 
 > **OHIF Viewer v3 Extension for DICOM Dataset Management, Export, & Client-Side Anonymization**
 
-* **Author**: **Nick Hermans** (Medical Imaging Engineer)
+* **Author**: **Nick Hermans**
 * **Institution**: **UZ Leuven** (University Hospitals Leuven, Information Technology and Data Department — PACS, eHealth HUB and Telematics team)
 * **Contact**: [`nick.hermans@uzleuven.be`](mailto:nick.hermans@uzleuven.be)
 * **Package**: `@ohif/extension-download-manager` (OHIF v3 Platform)
@@ -11,9 +11,9 @@
 
 ## Summary
 
-The **OHIF Download Manager** is a medical-grade browser extension engineered for the OHIF (Open Health Imaging Foundation) v3 Viewer platform. Developed at **UZ Leuven** by medical imaging engineers in the Information Technology and Data Department (PACS, eHealth HUB and Telematics team), this extension bridges clinical medical imaging viewer workflows with research data governance, enabling clinicians, researchers, and PACS administrators to filter, batch export, package, and anonymize DICOM imaging datasets directly within client-side browser sessions.
+The **OHIF Download Manager** is a OHIF extension for the OHIF (Open Health Imaging Foundation) v3 Viewer platform. Developed at **UZ Leuven** by the Information Technology and Data Department (PACS, eHealth HUB and Telematics team), this extension bridges clinical medical imaging viewer workflows with research data governance, enabling clinicians, researchers, and PACS administrators to filter, batch export, package, and anonymize DICOM imaging datasets directly within client-side browser sessions.
 
-The extension executes **100% client-side**, eliminating external server dependencies or third-party cloud uploads. It features high-performance streaming ZIP writers, WebAssembly-based DICOM frame transcoding, optical character recognition (OCR) with Stroke-Width Transform (SWT) anatomical topology filtering for pixel redaction, and strict compliance with the **[DICOM PS 3.15 Annex E Basic Application Level Confidentiality Profile](https://dicom.nema.org/medical/dicom/current/output/chtml/part15/chapter_E.html)** including full de-identification audit provenance injection.
+The extension executes **100% client-side**, eliminating external server dependencies or third-party cloud uploads. It features streaming ZIP writers, WebAssembly-based DICOM frame transcoding, optical character recognition (OCR) with Stroke-Width Transform (SWT) anatomical topology filtering for pixel redaction, and attempts compliance with the **[DICOM PS 3.15 Annex E Basic Application Level Confidentiality Profile](https://dicom.nema.org/medical/dicom/current/output/chtml/part15/chapter_E.html)** including full de-identification audit provenance injection.
 
 ---
 
@@ -93,7 +93,7 @@ extensions/download-manager/
 ├── docs/                          # Comprehensive user & technical documentation suite
 ├── [SHORTCOMINGS.md](./SHORTCOMINGS.md)                # Safety audit log & technical boundary reference
 ├── package.json                   # Package manifest & dependencies
-└── README.md                      # Primary technical & scientific README
+└── README.md                      # Primary technical README
 ```
 
 ---
@@ -147,7 +147,7 @@ window.config = {
 
 ## Technical Documentation Suite
 
-For detailed engineering guides, compliance specifications, and user manuals, consult the **[Documentation Suite](./docs/index.md)**:
+For detailed guides, compliance specifications, and user manuals, consult the **[Documentation Suite](./docs/index.md)**:
 
 1. **[01. Overview & Quickstart](./docs/01-overview-and-quickstart.md)**: UI toolbar, launch modes, dialogs, and step-by-step export workflow.
 2. **[02. Dataset Selection & Filtering](./docs/02-dataset-selection-and-filtering.md)**: Multi-study scoping, modality filtering, and manifest pre-flight checks.
@@ -181,7 +181,7 @@ Licensed under the **MIT License**. See [LICENSE](./LICENSE) for full details.
 > 
 > IN NO EVENT SHALL THE AUTHOR (**NICK HERMANS**), **UZ LEUVEN** (UNIVERSITY HOSPITALS LEUVEN), OR ANY CONTRIBUTORS / COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, DATA LOSS, PRIVACY BREACH, REGULATORY NON-COMPLIANCE, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-### Third-Party Engineering Credits
+### Third-Party Credits
 - **DicomCleaner™ / PixelMed Toolkit** (BSD License) — Tag anonymization rules structure.
 - **RSNA MIRC Anonymizer / CTP** (Open Source) — De-identification profile references.
 - **Cornerstone3D & WebAssembly DICOM Codecs** — In-browser image decoding & transcoding.
