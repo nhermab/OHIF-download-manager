@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build Output
+dist/
+
+# Test Outputs & Coverage
+coverage/
+junit.xml
+
+# System & Editor Files
+.DS_Store
+*.log
+.idea/
+.vscode/

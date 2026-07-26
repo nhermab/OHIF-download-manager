@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anonymizer Rules Tool</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; background: #f5f7fa; color: #333; }
+        h1 { color: #2c3e50; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        button { background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        button:hover { background: #2980b9; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        th { background-scale: #f8f9fa; font-weight: 600; }
+        .missing { background-color: #ffebee; }
+        .diff { background-color: #fff3e0; }
+        .tag-name { color: #666; font-size: 0.9em; }
+        .success { color: #27ae60; }
+        .error { color: #c0392b; }
+        textarea { width: 100%; height: 300px; font-family: monospace; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>DICOM Anonymizer Rules Tool</h1>
+    
+    <div class="card">
+        <h2>1. Load Files</h2>
+        <p>This tool compares <code>anonymizer-rules.json</code> and <code>default-anonymizer.script</code>.</p>
+        <button id="btn-load">Auto-Load from Server</button>
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+            <p style="font-size: 0.9em; color: #666;">Or load manually if running via file://</p>
+            <input type="file" id="file-json" accept=".json"> (JSON)<br><br>
+            <input type="file" id="file-xml" accept=".script,.xml"> (Script)
+        </div>
+        <p id="load-status"></p>
+    </div>
+
+    <div class="card" id="results-card" style="display: none;">
+        <h2>2. Analysis & Differences</h2>
+        <p id="analysis-summary"></p>
+        <div style="max-height: 400px; overflow-y: auto;">
+            <table id="diff-table">
+                <thead>
+                    <tr>
+                        <th>Tag</th>
+                        <th>Name (from Script)</th>
+                        <th>JSON Rule</th>
+                        <th>Script Rule</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card" id="export-card" style="display: none;">
+        <h2>3. Export Enhanced JSON</h2>
+        <p>The enhanced JSON includes the human-readable tag names and all rules from the script.</p>
+        <button id="btn-download" style="background: #27ae60; margin-bottom: 15px;">Download rules.json</button>
+        <textarea id="export-preview" readonly></textarea>
+    </div>
+
+    <script>
+        let currentJson = null;
+        let scriptData = null; // Map of tag -> { name, rule }
+
+        document.getElementById('btn-load').addEventListener('click', async () => {
+            const status = document.getElementById('load-status');
+            status.textContent = 'Loading...';
+            status.className = '';
+            try {
+                const [resJson, resXml] = await Promise.all([
+                    fetch('anonymizer-rules.json'),
+                    fetch('default-anonymizer.script')
+                ]);
+                
+                if (!resJson.ok) throw new Error(`Failed to load JSON: ${resJson.status}`);
+                if (!resXml.ok) throw new Error(`Failed to load Script: ${resXml.status}`);
+
+                currentJson = await resJson.json();
+                const xmlText = await resXml.text();
+                parseScript(xmlText);
+                
+                status.textContent = 'Successfully loaded both files from server.';
+                status.className = 'success';
+                analyzeAndShow();
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message + ' (Try manual file selection if not on a web server)';
+                status.className = 'error';
+            }
+        });
+
+        document.getElementById('file-json').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                currentJson = JSON.parse(e.target.result);
+                checkManualLoad();
+            };
+            reader.readAsText(file);
+        });
+
+        document.getElementById('file-xml').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                parseScript(e.target.result);
+                checkManualLoad();
+            };
+            reader.readAsText(file);
+        });
+
+        function checkManualLoad() {
+            if (currentJson && scriptData) {
+                const status = document.getElementById('load-status');
+                status.textContent = 'Successfully loaded files manually.';
+                status.className = 'success';
+                analyzeAndShow();
+            }
+        }
+
+        function parseScript(xmlText) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+            const elements = xmlDoc.getElementsByTagName('e');
+            scriptData = {};
+            
+            for (let i = 0; i < elements.length; i++) {
+                const el = elements[i];
+                const tag = el.getAttribute('t');
+                const name = el.getAttribute('n');
+                const rule = el.textContent.trim();
+                if (tag) {
+                    scriptData[tag] = { name, rule };
+                }
+            }
+        }
+
+        function analyzeAndShow() {
+            const tableBody = document.querySelector('#diff-table tbody');
+            tableBody.innerHTML = '';
+            let missingCount = 0;
+            let diffCount = 0;
+            
+            const enhancedJson = {};
+            
+            // Collect all unique tags
+            const allTags = new Set([...Object.keys(currentJson), ...Object.keys(scriptData)]);
+            const sortedTags = Array.from(allTags).sort();
+
+            sortedTags.forEach(tag => {
+                const rawJsonValue = currentJson[tag];
+                const jsonRule = rawJsonValue && typeof rawJsonValue === 'object' ? rawJsonValue.rule : rawJsonValue;
+                const jsonName = rawJsonValue && typeof rawJsonValue === 'object' ? rawJsonValue.name : undefined;
+                const scriptInfo = scriptData[tag];
+                
+                let status = 'Match';
+                let rowClass = '';
+                
+                if (rawJsonValue === undefined) {
+                    status = 'Missing in JSON';
+                    rowClass = 'missing';
+                    missingCount++;
+                } else if (!scriptInfo) {
+                    status = 'Only in JSON';
+                    rowClass = 'diff';
+                } else if (jsonRule !== scriptInfo.rule) {
+                    status = 'Rule Mismatch';
+                    rowClass = 'diff';
+                    diffCount++;
+                }
+
+                // Build enhanced object
+                enhancedJson[tag] = {
+                    name: scriptInfo ? scriptInfo.name : (jsonName || 'Unknown'),
+                    rule: scriptInfo ? scriptInfo.rule : (jsonRule || "")
+                };
+
+                // Add to table only if there is a difference or it's missing, to keep it concise. 
+                // Or we can show all. Let's show all but highlight diffs.
+                // Actually, let's only show diffs/missing to make it useful.
+                if (status !== 'Match') {
+                    const tr = document.createElement('tr');
+                    tr.className = rowClass;
+                    tr.innerHTML = `
+                        <td>${tag}</td>
+                        <td>${scriptInfo ? scriptInfo.name : '-'}</td>
+                        <td>${jsonRule !== undefined ? jsonRule : '<em>null</em>'}</td>
+                        <td>${scriptInfo ? scriptInfo.rule : '<em>null</em>'}</td>
+                        <td>${status}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                }
+            });
+
+            document.getElementById('analysis-summary').innerHTML = 
+                `Found <b>${sortedTags.length}</b> total tags. 
+                 <b>${missingCount}</b> are missing from JSON. 
+                 <b>${diffCount}</b> have rule mismatches.`;
+            
+            document.getElementById('results-card').style.display = 'block';
+            
+            // Prepare Export
+            const exportStr = JSON.stringify(enhancedJson, null, 2);
+            document.getElementById('export-preview').value = exportStr;
+            document.getElementById('export-card').style.display = 'block';
+            
+            document.getElementById('btn-download').onclick = () => {
+                const blob = new Blob([exportStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'rules.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            };
+        }
+    </script>
+</body>
+</html>

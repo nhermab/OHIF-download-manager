@@ -1,0 +1,1107 @@
+:root {
+  --ohif-bg: #000;
+  --ohif-panel-bg: #0b1020;
+  --ohif-panel-bg-2: #111833;
+  --ohif-border: #1b2a4a;
+  --ohif-border-soft: #24365c;
+  --ohif-text: #ffffff;
+  --ohif-text-muted: #9fb3d1;
+  --ohif-accent: #20a5d6;
+  --ohif-accent-hover: #39b7e6;
+  --ohif-overlay-bg: rgba(0, 0, 0, 0.5);
+  --ohif-chip-bg: rgba(255, 255, 255, 0.08);
+  --ohif-scrollbar: #2b3f66;
+  --ohif-scrollbar-thumb: #5070aa;
+  --ohif-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 4px 18px rgba(0,0,0,0.35);
+  --ohif-font: "Segoe UI", Arial, sans-serif;
+}
+
+.aquest-dm-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 42px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--ohif-border-soft);
+  border-radius: 6px;
+  background: var(--ohif-panel-bg-2);
+  color: var(--ohif-accent);
+  font: 12px/1.2 var(--ohif-font);
+  white-space: nowrap;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.aquest-dm-button:not(.aquest-dm-button--floating) {
+  margin-left: 10px;
+}
+
+.aquest-dm-button:not(.aquest-dm-button--floating):first-child {
+  margin-left: 0;
+}
+
+.aquest-dm-button--floating {
+  position: fixed;
+  top: 60px;
+  left: 12px;
+  right: auto;
+  bottom: auto;
+  z-index: 9998;
+  background: var(--ohif-panel-bg);
+  color: var(--ohif-text);
+  box-shadow: var(--ohif-shadow);
+}
+
+.aquest-dm-download-button:not(.aquest-dm-button--floating) {
+  height: 30px;
+  padding: 0 12px;
+  border-color: #2b3f66;
+  border-radius: 6px;
+  background: rgba(17, 24, 51, 0.95);
+  color: var(--ohif-accent);
+  font-size: 11px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+.aquest-dm-download-button:not(.aquest-dm-button--floating):hover,
+.aquest-dm-download-button:not(.aquest-dm-button--floating):focus-visible {
+  background: rgba(22, 34, 65, 0.98);
+  border-color: #345082;
+  color: var(--ohif-accent-hover);
+}
+
+.aquest-dm-download-button:not(.aquest-dm-button--floating) svg {
+  width: 15px;
+  height: 15px;
+}
+
+.aquest-dm-logout-button {
+  color: #ffb3b3;
+}
+
+.aquest-dm-logout-button:hover,
+.aquest-dm-logout-button:focus-visible {
+  color: #ffd9d9;
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.aquest-dm-logout-button.aquest-dm-button--floating {
+  top: auto;
+  left: 50%;
+  right: auto;
+  bottom: 12px;
+  transform: translateX(-50%);
+}
+
+.aquest-dm-logout-button:not(.aquest-dm-button--floating) {
+  height: 30px;
+  padding: 0 12px;
+  border-color: rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  background: rgba(17, 24, 51, 0.95);
+  color: #ffb3b3;
+  font-size: 11px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+.aquest-dm-logout-button:not(.aquest-dm-button--floating):hover,
+.aquest-dm-logout-button:not(.aquest-dm-button--floating):focus-visible {
+  background: rgba(36, 18, 34, 0.98);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #ffd9d9;
+}
+
+.aquest-dm-button:hover,
+.aquest-dm-button:focus-visible {
+  background: rgba(32, 165, 214, 0.08);
+  border-color: var(--ohif-border-soft);
+  color: var(--ohif-accent-hover);
+  outline: none;
+}
+
+.aquest-dm-toolbar-slot {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.aquest-dm-button svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+}
+
+.aquest-dm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--ohif-overlay-bg);
+  backdrop-filter: blur(2px);
+}
+
+.aquest-dm-dialog {
+  width: min(1120px, 100%);
+  max-height: min(880px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--ohif-border);
+  border-radius: 8px;
+  background: var(--ohif-panel-bg);
+  color: var(--ohif-text);
+  box-shadow: var(--ohif-shadow);
+  font: 14px/1.4 var(--ohif-font);
+}
+
+.aquest-dm-dialog,
+.aquest-dm-dialog * {
+  box-sizing: border-box;
+}
+
+.aquest-dm-header,
+.aquest-dm-footer {
+  flex: 0 0 auto;
+  padding: 18px 22px;
+  border-color: var(--ohif-border);
+}
+
+.aquest-dm-header {
+  border-bottom: 1px solid var(--ohif-border);
+  background: var(--ohif-panel-bg);
+}
+
+.aquest-dm-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid var(--ohif-border);
+  background: var(--ohif-panel-bg);
+}
+
+.aquest-dm-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ohif-text);
+}
+
+.aquest-dm-subtitle {
+  margin-top: 5px;
+  color: var(--ohif-text-muted);
+  font-size: 14px;
+}
+
+.aquest-dm-body {
+  min-height: 220px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 18px 22px 24px;
+  scrollbar-color: var(--ohif-scrollbar-thumb) var(--ohif-scrollbar);
+  scrollbar-gutter: stable;
+}
+
+.aquest-dm-body::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.aquest-dm-body::-webkit-scrollbar-track {
+  background: var(--ohif-scrollbar);
+}
+
+.aquest-dm-body::-webkit-scrollbar-thumb {
+  background: var(--ohif-scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.aquest-dm-body::-webkit-scrollbar-thumb:hover {
+  background: #6b8fd0;
+}
+
+.aquest-dm-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.aquest-dm-selection-actions,
+.aquest-dm-modality-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.aquest-dm-link-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ohif-accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.aquest-dm-link-button:hover {
+  color: var(--ohif-accent-hover);
+}
+
+.aquest-dm-chip-button {
+  border: 1px solid var(--ohif-border-soft);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: var(--ohif-chip-bg);
+  color: var(--ohif-text);
+  font: 12px/1.2 var(--ohif-font);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.aquest-dm-chip-button:hover,
+.aquest-dm-chip-button:focus-visible {
+  background: rgba(32, 165, 214, 0.12);
+  border-color: var(--ohif-accent);
+  color: var(--ohif-accent-hover);
+  outline: none;
+}
+
+.aquest-dm-chip-button.is-active {
+  background: rgba(32, 165, 214, 0.18);
+  border-color: var(--ohif-accent);
+  color: #fff;
+}
+
+.aquest-dm-modality-actions {
+  margin: 0 0 12px;
+}
+
+.aquest-dm-series-list {
+  display: grid;
+  gap: 8px;
+}
+
+.aquest-dm-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(32, 165, 214, 0.25);
+  border-radius: 6px;
+  background: rgba(32, 165, 214, 0.08);
+  color: var(--ohif-text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.aquest-dm-tip--error {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.1);
+  color: #ffb3b3;
+}
+
+.aquest-dm-tip-icon {
+  flex: 0 0 auto;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.aquest-dm-tip-text strong {
+  color: var(--ohif-text);
+}
+
+/* Exam group headers, shown when the session spans several exams */
+.aquest-dm-study-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 2px 4px;
+  margin-top: 6px;
+  border-top: 1px solid var(--ohif-border-soft);
+}
+
+.aquest-dm-study-header:first-child {
+  margin-top: 0;
+  padding-top: 2px;
+  border-top: none;
+}
+
+.aquest-dm-study-badge {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(32, 165, 214, 0.15);
+  border: 1px solid rgba(32, 165, 214, 0.4);
+  color: var(--ohif-accent);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.aquest-dm-study-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--ohif-text);
+  font-size: 13px;
+}
+
+.aquest-dm-study-select {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.aquest-dm-series {
+  display: grid;
+  grid-template-columns: auto 48px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 68px;
+  padding: 8px 12px;
+  border: 1px solid var(--ohif-border-soft);
+  border-radius: 6px;
+  background: var(--ohif-panel-bg-2);
+}
+
+.aquest-dm-series input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--ohif-accent);
+}
+
+.aquest-dm-thumbnail {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border: 1px solid var(--ohif-border);
+  border-radius: 4px;
+  background: #000;
+}
+
+.aquest-dm-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.aquest-dm-thumbnail--empty {
+  background: #05080c;
+}
+
+.aquest-dm-thumbnail-modality {
+  position: absolute;
+  left: 4px;
+  bottom: 3px;
+  max-width: 40px;
+  overflow: hidden;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.aquest-dm-series-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.aquest-dm-series-name {
+  display: block;
+  font-weight: 500;
+  color: var(--ohif-text);
+  overflow-wrap: anywhere;
+}
+
+.aquest-dm-series-meta,
+.aquest-dm-note {
+  color: var(--ohif-text-muted);
+  font-size: 12px;
+}
+
+.aquest-dm-pill {
+  min-width: 74px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--ohif-chip-bg);
+  color: var(--ohif-text-muted);
+  text-align: center;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.aquest-dm-progress {
+  display: grid;
+  gap: 12px;
+}
+
+.aquest-dm-progress-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ohif-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.aquest-dm-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--ohif-border-soft);
+}
+
+.aquest-dm-progress-bar {
+  width: 0;
+  height: 100%;
+  background: var(--ohif-accent);
+  transition: width 120ms linear;
+  border-radius: 999px;
+}
+
+.aquest-dm-progress-current {
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ohif-text-muted);
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+.aquest-dm-log {
+  max-height: 240px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 4px;
+  background: #000;
+  color: #cbd6df;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  scrollbar-color: var(--ohif-scrollbar-thumb) var(--ohif-scrollbar);
+}
+
+.aquest-dm-log::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.aquest-dm-log::-webkit-scrollbar-track {
+  background: var(--ohif-scrollbar);
+}
+
+.aquest-dm-log::-webkit-scrollbar-thumb {
+  background: var(--ohif-scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.aquest-dm-log-entry {
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+
+.aquest-dm-log-entry--success {
+  color: #10b981;
+}
+
+.aquest-dm-log-entry--warning {
+  color: #f59e0b;
+}
+
+.aquest-dm-log-entry--error {
+  color: #ef4444;
+}
+
+.aquest-dm-log-entry--info {
+  color: var(--ohif-text-muted);
+}
+
+.aquest-dm-log-time {
+  margin-right: 6px;
+  color: #10b981;
+}
+
+.aquest-dm-action,
+.aquest-dm-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font: 13px/1 var(--ohif-font);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.aquest-dm-action {
+  border: 1px solid var(--ohif-accent);
+  background: var(--ohif-accent);
+  color: #fff;
+}
+
+.aquest-dm-action:hover {
+  background: var(--ohif-accent-hover);
+  border-color: var(--ohif-accent-hover);
+}
+
+.aquest-dm-secondary {
+  border: 1px solid var(--ohif-border-soft);
+  background: var(--ohif-panel-bg-2);
+  color: var(--ohif-text);
+}
+
+.aquest-dm-secondary:hover {
+  background: #162241;
+  border-color: #345082;
+}
+
+.aquest-dm-action:disabled,
+.aquest-dm-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.aquest-dm-error {
+  padding: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ffb3b3;
+}
+
+.aquest-dm-session-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 2px solid #ef4444;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.aquest-dm-session-error-icon {
+  flex: 0 0 auto;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.aquest-dm-session-error-text {
+  color: #ffb3b3;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.aquest-dm-session-error-text strong {
+  color: #ef4444;
+}
+
+@media (max-width: 640px) {
+  .aquest-dm-button--floating {
+    top: 56px;
+    left: 8px;
+    right: auto;
+    bottom: auto;
+  }
+
+  .aquest-dm-logout-button.aquest-dm-button--floating {
+    top: auto;
+    left: 50%;
+    right: auto;
+    bottom: 8px;
+  }
+
+  .aquest-dm-overlay {
+    align-items: flex-end;
+    padding: 10px;
+  }
+
+  .aquest-dm-dialog {
+    max-height: calc(100vh - 20px);
+  }
+
+  .aquest-dm-series {
+    grid-template-columns: auto 44px minmax(0, 1fr);
+  }
+
+  .aquest-dm-thumbnail {
+    width: 44px;
+    height: 44px;
+  }
+
+  .aquest-dm-pill {
+    grid-column: 3;
+    width: max-content;
+  }
+
+  .aquest-dm-progress-stats {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+/* Anonymizer Control Panel Styles */
+.aquest-dm-anon-card {
+  margin: 12px 0 16px;
+  border: 1px solid var(--ohif-border-soft);
+  border-radius: 8px;
+  background: var(--ohif-panel-bg-2);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.aquest-dm-anon-card.has-warning {
+  border-color: rgba(245, 158, 11, 0.6);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
+}
+
+.aquest-dm-anon-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.25);
+  user-select: none;
+}
+
+.aquest-dm-anon-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ohif-text);
+}
+
+.aquest-dm-anon-toggle-label input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--ohif-accent);
+  cursor: pointer;
+}
+
+.aquest-dm-anon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.aquest-dm-anon-badge--strict {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #10b981;
+}
+
+.aquest-dm-anon-badge--warning {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #f59e0b;
+}
+
+.aquest-dm-anon-badge--disabled {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--ohif-text-muted);
+}
+
+.aquest-dm-anon-warning-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #fcd34d;
+}
+
+.aquest-dm-anon-warning-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.aquest-dm-anon-warning-text {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #fef08a;
+}
+
+.aquest-dm-anon-warning-list {
+  margin: 4px 0 6px 18px;
+  padding: 0;
+  font-size: 11px;
+  color: #fde68a;
+}
+
+.aquest-dm-anon-warning-list li {
+  margin-bottom: 2px;
+}
+
+.aquest-dm-anon-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ohif-border-soft);
+  background: rgba(0,0,0,0.15);
+}
+
+.aquest-dm-anon-presets-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ohif-text-muted);
+  margin-right: 4px;
+  text-transform: uppercase;
+}
+
+.aquest-dm-anon-preset-btn {
+  min-height: 32px;
+  padding: 6px 11px;
+  border: 1px solid var(--ohif-border-soft);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.05);
+  color: var(--ohif-text-muted);
+  font: 12px/1.2 var(--ohif-font);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.aquest-dm-anon-preset-btn:hover {
+  background: rgba(32, 165, 214, 0.12);
+  border-color: var(--ohif-accent);
+  color: #fff;
+}
+
+.aquest-dm-anon-preset-btn.is-active {
+  background: rgba(32, 165, 214, 0.22);
+  border-color: var(--ohif-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.aquest-dm-anon-body {
+  padding: 16px;
+}
+
+.aquest-dm-anon-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  border-bottom: 1px solid var(--ohif-border-soft);
+  margin-bottom: 18px;
+}
+
+.aquest-dm-anon-tab-btn {
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ohif-text-muted);
+  font: 13px/1.25 var(--ohif-font);
+  cursor: pointer;
+  white-space: normal;
+}
+
+.aquest-dm-anon-tab-btn:hover {
+  color: var(--ohif-text);
+}
+
+.aquest-dm-anon-tab-btn.is-active {
+  border-bottom-color: var(--ohif-accent);
+  color: var(--ohif-accent);
+  font-weight: 600;
+}
+
+.aquest-dm-anon-tab-content {
+  display: none;
+}
+
+.aquest-dm-anon-tab-content.is-active {
+  display: block;
+}
+
+.aquest-dm-anon-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+.aquest-dm-anon-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 4px;
+}
+
+.aquest-dm-anon-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ohif-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.aquest-dm-anon-field input[type="text"],
+.aquest-dm-anon-field input[type="number"],
+.aquest-dm-anon-field select,
+.aquest-dm-anon-field textarea {
+  min-width: 0;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--ohif-border-soft);
+  border-radius: 4px;
+  color: #fff;
+  font: 13px/1.3 var(--ohif-font);
+}
+
+.aquest-dm-anon-field input:focus,
+.aquest-dm-anon-field select:focus,
+.aquest-dm-anon-field textarea:focus {
+  border-color: var(--ohif-accent);
+  outline: none;
+}
+
+.aquest-dm-anon-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.aquest-dm-anon-checkbox-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ohif-text);
+  cursor: pointer;
+}
+
+.aquest-dm-anon-checkbox-item input[type="checkbox"] {
+  margin-top: 2px;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--ohif-accent);
+  cursor: pointer;
+}
+
+.aquest-dm-anon-redaction-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin: 6px 0 8px;
+  padding-left: 24px;
+}
+
+.aquest-dm-anon-hint {
+  font-size: 12px;
+  color: var(--ohif-text-muted);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+.aquest-dm-anon-footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-top: 16px;
+  border-top: 1px solid var(--ohif-border-soft);
+  background: rgba(0,0,0,0.15);
+}
+
+.aquest-dm-secondary-sm {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--ohif-border-soft);
+  border-radius: 4px;
+  background: var(--ohif-panel-bg-2);
+  color: var(--ohif-text);
+  font: 12px/1 var(--ohif-font);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.aquest-dm-secondary-sm:hover {
+  background: #162241;
+  border-color: var(--ohif-accent);
+  color: var(--ohif-accent-hover);
+}
+
+.aquest-dm-anon-whitelist-editor-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.aquest-dm-anon-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.aquest-dm-anon-tag-chip-add {
+  padding: 3px 8px;
+  border: 1px dashed var(--ohif-border-soft);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ohif-text-muted);
+  font: 11px/1.2 var(--ohif-font);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.aquest-dm-anon-tag-chip-add:hover {
+  background: rgba(32, 165, 214, 0.15);
+  border-color: var(--ohif-accent);
+  color: #fff;
+}
+
+.aquest-dm-anon-whitelist-textarea {
+  width: 100%;
+  min-height: 85px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--ohif-border-soft);
+  border-radius: 4px;
+  color: #fff;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  resize: vertical;
+}
+
+.aquest-dm-anon-whitelist-textarea:focus {
+  border-color: var(--ohif-accent);
+  outline: none;
+}
+
+.aquest-dm-anon-tag-resolved-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--ohif-border-soft);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.aquest-dm-anon-resolved-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font: 11px/1.2 var(--ohif-font);
+}
+
+.aquest-dm-anon-tag-code-text {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  color: var(--ohif-accent);
+  font-weight: 600;
+}
+
+.aquest-dm-anon-tag-name-text {
+  color: #9ca3af;
+  font-style: normal;
+}
+
+@media (max-width: 800px) {
+  .aquest-dm-anon-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-bottom: 0;
+  }
+
+  .aquest-dm-anon-tab-btn {
+    border: 1px solid var(--ohif-border-soft);
+    border-radius: 5px;
+  }
+
+  .aquest-dm-anon-tab-btn.is-active {
+    border-color: var(--ohif-accent);
+    background: rgba(32, 165, 214, 0.12);
+  }
+}
+
+@media (max-width: 640px) {
+  .aquest-dm-header,
+  .aquest-dm-footer {
+    padding: 14px 16px;
+  }
+
+  .aquest-dm-body {
+    padding: 14px 16px 18px;
+  }
+
+  .aquest-dm-title {
+    font-size: 18px;
+  }
+
+  .aquest-dm-anon-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .aquest-dm-anon-header-bar,
+  .aquest-dm-anon-footer-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .aquest-dm-anon-tabs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .aquest-dm-anon-tab-btn {
+    min-height: 38px;
+    text-align: left;
+  }
+
+  .aquest-dm-anon-footer-bar .aquest-dm-secondary-sm {
+    width: 100%;
+  }
+
+  .aquest-dm-anon-redaction-options {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-left: 23px;
+  }
+}
