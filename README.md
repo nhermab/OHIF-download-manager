@@ -3,7 +3,7 @@
 > **OHIF Viewer v3 Extension for DICOM Dataset Management, Export, & Client-Side Anonymization**
 
 * **Author**: **Nick Hermans**
-* **Institution**: **UZ Leuven** (University Hospitals Leuven, Information Technology and Data Department — PACS, eHealth HUB and Telematics team)
+* **Institution**: **UZ Leuven** (University Hospitals Leuven, Information Technology and Data Department; PACS, eHealth HUB and Telematics team)
 * **Contact**: [`nick.hermans@uzleuven.be`](mailto:nick.hermans@uzleuven.be)
 * **Package**: `@ohif/extension-download-manager` (OHIF v3 Platform)
 
