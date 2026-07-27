@@ -2,7 +2,7 @@
 
 > **OHIF Viewer v3 Extension for DICOM Dataset Management, Export, & Client-Side Anonymization**
 
- (https://ohif.ehealthhub.be/viewer?StudyInstanceUIDs=1.2.276.0.7230010.3.1.2.2155604110.4180.1021041295.21)[Online DEMO]
+ [Online DEMO](https://ohif.ehealthhub.be/viewer?StudyInstanceUIDs=1.2.276.0.7230010.3.1.2.2155604110.4180.1021041295.21)
 (download button top toolbar left side) 
 
 ## Summary
