@@ -18,6 +18,7 @@ export default function DownloadManagerPanel({
 }) {
   const [payload, setPayload] = useState<any>(() => currentPayload());
   const [activeStats, setActiveStats] = useState<any>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -26,14 +27,15 @@ export default function DownloadManagerPanel({
         setActiveStats({ ...globalState.downloadStats });
       } else {
         setActiveStats(null);
+        setConfirmCancel(false);
       }
-    }, 1000);
+    }, 500);
     return () => clearInterval(interval);
   }, []);
 
   const studies = payload?.studies || [];
   const allSeries = flattenSeries(studies);
-  const totalFiles = allSeries.reduce((sum, s) => sum + buildManifest([s]).length, 0);
+  const totalFiles = buildManifest(allSeries).length;
 
   const handleOpenModal = () => {
     if (commandsManager) {
@@ -87,32 +89,77 @@ export default function DownloadManagerPanel({
           <div className="text-muted-foreground truncate text-xs">
             {activeStats.currentItem || 'Downloading DICOM files…'}
           </div>
-          <div className="border-input bg-background h-2 w-full overflow-hidden rounded-full border">
-            <div
-              className="bg-primary h-2 rounded-full transition-all duration-300"
-              style={{
-                width: `${
-                  activeStats.total
-                    ? Math.round(
-                        ((activeStats.done + activeStats.failed) * 100) / activeStats.total
-                      )
-                    : 0
-                }%`,
-              }}
-            />
-          </div>
-          <div className="text-muted-foreground flex justify-between text-xs">
+          {(() => {
+            const completed = (activeStats.done || 0) + (activeStats.failed || 0);
+            const percent = activeStats.total
+              ? Math.round((completed * 100) / activeStats.total)
+              : 0;
+            return (
+              <div
+                role="progressbar"
+                aria-valuenow={percent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuetext={`${completed} of ${activeStats.total || 0} files processed`}
+                className="border-input bg-background h-2 w-full overflow-hidden rounded-full border"
+              >
+                <div
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    activeStats.failed > 0 ? 'bg-amber-500' : 'bg-primary'
+                  }`}
+                  style={{ width: `${percent}%` }}
+                />
+              </div>
+            );
+          })()}
+          <div className="text-muted-foreground flex items-center justify-between text-xs">
             <span>
               {activeStats.done} / {activeStats.total} saved
+              {activeStats.failed > 0 && (
+                <span className="text-amber-500 font-medium"> · {activeStats.failed} failed</span>
+              )}
             </span>
-            <Button
-              onClick={() => globalState.activeAbortController?.abort()}
-              variant="link"
-              size="sm"
-            >
-              Cancel
-            </Button>
+            {!confirmCancel && (
+              <Button
+                onClick={() => setConfirmCancel(true)}
+                variant="link"
+                size="sm"
+              >
+                Cancel
+              </Button>
+            )}
           </div>
+          {confirmCancel && (
+            <div
+              role="alertdialog"
+              aria-label="Stop the download?"
+              className="border-amber-500/40 bg-amber-500/10 text-foreground space-y-2 rounded border p-2 text-xs"
+            >
+              <p>
+                Stop this download? {activeStats.done || 0} of {activeStats.total || 0} files are
+                already saved and will stay in your export destination.
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    setConfirmCancel(false);
+                    globalState.activeAbortController?.abort();
+                  }}
+                >
+                  Stop download
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setConfirmCancel(false)}
+                >
+                  Keep downloading
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       ) : null}
 

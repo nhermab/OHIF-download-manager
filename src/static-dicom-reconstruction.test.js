@@ -225,6 +225,118 @@ describe('static DICOMweb reconstruction', () => {
     expect(dicomInline).toBeDefined();
   });
 
+  it('resolves context dependent value representations without degrading them to UN', async () => {
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const metadata = {
+      SOPClassUID: '1.2.840.10008.5.1.4.1.1.7',
+      SOPInstanceUID: '2.25.123',
+      Rows: 1,
+      Columns: 2,
+      SamplesPerPixel: 1,
+      PhotometricInterpretation: 'MONOCHROME2',
+      BitsAllocated: 16,
+      BitsStored: 16,
+      HighBit: 15,
+      // Signed pixels: the "US or SS" attributes below have to be written as SS.
+      PixelRepresentation: 1,
+      SmallestImagePixelValue: -1024,
+      PixelPaddingValue: -2000,
+      ModalityLUTSequence: [
+        {
+          LUTDescriptor: [4, -1024, 16],
+          LUTData: [{ InlineBinary: 'AAECAw==' }],
+          _vrMap: { LUTDescriptor: 'US|SS', LUTData: 'US|OW' },
+        },
+      ],
+      _vrMap: { SmallestImagePixelValue: 'US|SS', PixelPaddingValue: 'US|SS' },
+    };
+    const blob = reconstructDicomFromFrames(metadata, [new Uint8Array([10, 20, 30, 40]).buffer]);
+    const dicom = dcmjs.data.DicomMessage.readFile(await readBlob(blob));
+
+    // dcmjs logs "Invalid vr type US|SS - using UN" for anything it cannot map.
+    expect(error).not.toHaveBeenCalled();
+    expect(dicom.dict['00280106'].vr).toBe('SS');
+    expect(dicom.dict['00280106'].Value).toEqual([-1024]);
+    expect(dicom.dict['00280120'].vr).toBe('SS');
+    expect(dicom.dict['00280120'].Value).toEqual([-2000]);
+    const lutItem = dicom.dict['00283000'].Value[0];
+    expect(lutItem['00283002'].vr).toBe('SS');
+    expect(lutItem['00283002'].Value).toEqual([4, -1024, 16]);
+    // Lookup table data serialized as raw words stays OW.
+    expect(lutItem['00283006'].vr).toBe('OW');
+    // The caller's metadata is shared viewer state and must not be rewritten.
+    expect(metadata._vrMap.SmallestImagePixelValue).toBe('US|SS');
+    expect(metadata.ModalityLUTSequence[0]._vrMap.LUTData).toBe('US|OW');
+
+    error.mockRestore();
+  });
+
+  it('keeps private tags without a dictionary entry instead of warning about them', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const metadata = {
+      SOPClassUID: '1.2.840.10008.5.1.4.1.1.7',
+      SOPInstanceUID: '2.25.123',
+      Rows: 1,
+      Columns: 2,
+      SamplesPerPixel: 1,
+      PhotometricInterpretation: 'MONOCHROME2',
+      BitsAllocated: 8,
+      BitsStored: 8,
+      HighBit: 7,
+      PixelRepresentation: 0,
+      '00090010': 'dedupped',
+      '00091010': ['d4458c12', 'b5285639'],
+      '00091012': 'instance',
+      // OHIF attaches these to instance metadata; they are not DICOM.
+      imageId: 'wadors:https://example.test/instances/3/frames/1',
+      wadoRoot: 'https://example.test',
+    };
+    const blob = reconstructDicomFromFrames(metadata, [new Uint8Array([10, 20]).buffer]);
+    const dicom = dcmjs.data.DicomMessage.readFile(await readBlob(blob));
+
+    expect(warn).not.toHaveBeenCalled();
+    // The private creator keeps its standard LO representation.
+    expect(dicom.dict['00090010'].vr).toBe('LO');
+    expect(dicom.dict['00090010'].Value).toEqual(['dedupped']);
+    // Private data of unknown representation is written verbatim as UN.
+    expect(dicom.dict['00091012'].vr).toBe('UN');
+    expect(new TextDecoder().decode(dicom.dict['00091012'].Value[0])).toBe('instance');
+    // Odd-length values are space padded to the even length DICOM requires.
+    expect(new TextDecoder().decode(dicom.dict['00091010'].Value[0])).toBe('d4458c12\\b5285639 ');
+    expect(dicom.dict['0009103A']).toBeUndefined();
+
+    warn.mockRestore();
+  });
+
+  it('drops private values whose binary representation cannot be recovered', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    const metadata = {
+      SOPClassUID: '1.2.840.10008.5.1.4.1.1.7',
+      SOPInstanceUID: '2.25.123',
+      Rows: 1,
+      Columns: 2,
+      BitsAllocated: 8,
+      '00191001': 4096,
+      '00191002': { BulkDataURI: 'https://example.test/bulk/1' },
+    };
+    const blob = reconstructDicomFromFrames(metadata, [new Uint8Array([10, 20]).buffer]);
+    const dicom = dcmjs.data.DicomMessage.readFile(await readBlob(blob));
+
+    expect(warn).not.toHaveBeenCalled();
+    expect(dicom.dict['00191001']).toBeUndefined();
+    expect(dicom.dict['00191002']).toBeUndefined();
+    expect(debug).toHaveBeenCalledTimes(2);
+
+    // Reconstructing further instances of the same series stays quiet.
+    debug.mockClear();
+    reconstructDicomFromFrames(metadata, [new Uint8Array([10, 20]).buffer]);
+    expect(debug).not.toHaveBeenCalled();
+
+    warn.mockRestore();
+    debug.mockRestore();
+  });
+
   it('rejects multi-frame retrieval when inconsistent transfer syntaxes are returned', async () => {
     const originalFetch = global.fetch;
     const fetchSpy = jest.fn();

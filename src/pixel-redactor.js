@@ -12,11 +12,14 @@
 import { runOcrOnFrame } from "./ocr-engine.js";
 import { extractMetadataValues, classifyPhiInOcrResults } from "./phi-classifier.js";
 import {
+  clearCodecDiagnostics,
   decodeDicomFrame,
+  describeLastCodecFailure,
   encodeDicomFrame,
   encodeRLEFrame,
   encapsulateFrameBuffers,
   isEncapsulatedTransferSyntax,
+  setCodecVerboseLogging,
   TRANSFER_SYNTAX_UIDS,
 } from "./dicom-codecs.js";
 
@@ -24,6 +27,20 @@ function getTagValue(dict, tag, defaultValue = null) {
   const el = dict[tag];
   if (!el || !el.Value || !el.Value.length) return defaultValue;
   return el.Value[0];
+}
+
+/**
+ * Largest unsigned value representable in `bitsStored` bits.
+ *
+ * `1 << bitsStored` is a 32-bit signed shift: it yields a negative number at 31
+ * bits and wraps back to 1 at 32, which would turn the MONOCHROME1 fill value
+ * and the redaction clamp into nonsense for Float/32-bit stored pixel data.
+ * Exponentiation stays exact for every bit width DICOM allows.
+ */
+function maxStoredValue(bitsStored) {
+  const bits = Number(bitsStored);
+  if (!Number.isFinite(bits) || bits < 1) return 0;
+  return Math.pow(2, Math.min(bits, 53)) - 1;
 }
 
 export function isBurnedInAnnotation(dict) {
@@ -45,6 +62,14 @@ export async function redactDicomPixelData(dicomDict, options = {}) {
       console.log(`[Pixel Redactor] ${msg}`);
     }
   };
+  // Codec diagnostics follow the same opt-in as the rest of the extension's
+  // logging (DM-017); they are always collected, only never printed by default.
+  // Clearing here scopes them to this instance, so a fallback message can never
+  // attribute a cause recorded while processing a different file. Codec loaders
+  // cache only on success, so a persistent load failure is re-recorded per
+  // instance rather than lost.
+  setCodecVerboseLogging(verbose);
+  clearCodecDiagnostics();
 
   const isBurnedIn = isBurnedInAnnotation(dict);
   const forceIgnore = options.forceIgnoreBurnedInAnnotation === true;
@@ -157,7 +182,13 @@ export async function redactDicomPixelData(dicomDict, options = {}) {
             // codec is unavailable. Do not turn an otherwise usable metadata
             // anonymization export into a failed download. Pixel bytes and the
             // source transfer syntax are deliberately left untouched here.
-            const message = `Pixel redaction skipped: unable to decode frame ${f} for Transfer Syntax ${transferSyntax}. The original compressed pixel data was preserved.`;
+            // Report *why* the codec could not produce a frame (DM-027): a
+            // missing codec package and a corrupt bitstream both surface as a
+            // null decode, and the operator needs to tell them apart.
+            const cause = describeLastCodecFailure();
+            const message =
+              `Pixel redaction skipped: unable to decode frame ${f} for Transfer Syntax ${transferSyntax}. ` +
+              `The original compressed pixel data was preserved.${cause ? ` Cause: ${cause}` : ''}`;
             log(message);
             if (Array.isArray(options.warnings)) {
               options.warnings.push(message);
@@ -287,12 +318,12 @@ export async function redactDicomPixelData(dicomDict, options = {}) {
   if (pixelPaddingValue !== null && pixelPaddingValue !== undefined) {
     fillVal = Number(pixelPaddingValue);
   } else if (photometric === "MONOCHROME1") {
-    fillVal = (1 << bitsStored) - 1;
+    fillVal = maxStoredValue(bitsStored);
   } else {
     fillVal = 0;
   }
 
-  const maxPixelVal = (1 << bitsStored) - 1;
+  const maxPixelVal = maxStoredValue(bitsStored);
   const minPixelVal = 0;
 
   let redactedBoxCount = 0;
@@ -557,7 +588,7 @@ function createFrameImageData(
   if (wwEl && wwEl.Value && wwEl.Value.length) windowWidth = parseFloat(wwEl.Value[0]);
 
   let minVal = 0;
-  let maxVal = (1 << bitsStored) - 1;
+  let maxVal = maxStoredValue(bitsStored);
 
   if (windowCenter !== null && windowWidth !== null && windowWidth > 0) {
     minVal = windowCenter - windowWidth / 2;

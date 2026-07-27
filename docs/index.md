@@ -20,6 +20,9 @@ Welcome to the technical documentation suite for `@ohif/extension-download-manag
 | **[03. Metadata Anonymization](./03-metadata-anonymization.md)** | DICOM PS 3.15 Annex E tag rules engine, privacy presets, tag whitelists, and provenance injection. | Privacy Officers, Data Managers |
 | **[04. Pixel Redaction & Technical Limitations](./04-pixel-redaction-and-limitations.md)** | Micro-OCR engine, Stroke-Width Transform (SWT) edge topology filtering, WebAssembly codecs, and safety boundaries. | Compliance Officers, Researchers |
 | **[05. Storage Writers & Troubleshooting](./05-storage-directory-layout-troubleshooting.md)** | Direct Folder streaming, OPFS/IndexedDB ZIP streaming, neutral directory layout, and troubleshooting. | IT / PACS Admins, System Integrators |
+| **[06. UI States, Messages, Failures & Retry Flows](./06-ui-error-and-retry-flows.md)** | UI surface map, modal state machine, error classification tree, retry and cancellation flows, message inventory. | UX, Support, Front-end Engineers |
+
+> **Improvement backlog**: [`UI-shortcomings.md`](../UI-shortcomings.md) documents how error handling, retries, and notifications in the user interface should be improved. It is the UX counterpart to the safety/conformance audit in [`SHORTCOMINGS.md`](../SHORTCOMINGS.md).
 
 ---
 

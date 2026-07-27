@@ -83,6 +83,45 @@ Client-only anonymization hardening added after this audit:
   De-identification Method provenance fields rather than asserting Basic Profile
   or Clean Pixel Data conformance.
 
+### Correctness fixes — 2026-07-27
+
+These close specific defects listed under the findings below. They narrow the
+findings; they do not close them, because the external conformance, pixel-integrity,
+and OCR-performance evidence those findings also require is still absent.
+
+- DM-011 (partial): `encapsulateFrameBuffers` now pads every Pixel Data fragment
+  to an even Item length. Odd-length codec output previously produced an invalid
+  encapsulated Pixel Data element (PS3.5 7.5, A.4). The offset-table and
+  round-trip pixel-verification parts of DM-011 remain open.
+- DM-005 (partial): the maximum stored pixel value is no longer computed with
+  `1 << bitsStored`. That 32-bit signed shift is negative at 31 bits and wraps to
+  `1` at 32, which corrupted the MONOCHROME1 fill value and the redaction clamp
+  for wide stored representations.
+- DM-005 (partial): RLE Lossless segment handling was generalised to the PS3.5
+  G.2 model — segments ordered by sample, most significant byte first. The
+  previous 16-bit branch ignored `SamplesPerPixel`, so 16-bit colour was both
+  decoded and encoded incorrectly. The last segment is now bounded by the end of
+  the fragment instead of by a 17th offset-table entry that does not exist, and
+  `encodeRLEFrame` rejects pixel organizations needing more than 15 segments
+  rather than emitting a truncated header. The wider unsupported-pixel-format
+  matrix in DM-005 remains open.
+- DM-027 (partial): codec load, decode, and encode failures are recorded in a
+  bounded, PHI-free diagnostics buffer instead of being swallowed by empty catch
+  blocks, and the reason is appended to the operator-visible "pixel redaction
+  skipped" warning. A caller can now distinguish an absent codec package from a
+  corrupt bitstream. Console output remains opt-in per DM-017. Build-time codec
+  presence checks and the transfer-syntax conformance matrix remain open.
+- DM-016 (partial): video and other non-DICOM payloads are still exported, but
+  are no longer bypassed silently. Each is logged as `Not anonymized`, added to
+  the summary warning list, and recorded under `notAnonymized` in
+  `export-manifest.json` alongside an `anonymizationRequested` flag. The
+  blocking preflight for unsupported objects remains open.
+
+Test evidence added with these fixes: `src/dicom-codecs.test.js` (fragment
+padding, RLE round-trips for 16-bit monochrome, 8-bit colour, and 16-bit colour,
+segment-count rejection, final-segment bounding, and diagnostics behaviour) and a
+DM-016 case in `src/downloader.test.js`. The suite is 9 files and 68 tests.
+
 DM-011, DM-012, DM-013, DM-014, DM-015, DM-018, DM-028, and DM-029 require an
 organization-governed validated de-identification/export service, authorization/audit
 integration, and quality-system evidence. They cannot truthfully be closed by a

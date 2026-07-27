@@ -6,6 +6,16 @@
 import { isRetryableError, retryAfterMs, retryDelayMs, downloadManifest } from './downloader';
 import { buildManifest } from './manifest';
 
+// jsdom's Blob implements neither text() nor Response, so read it via FileReader.
+function readBlobText(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  });
+}
+
 describe('download retry policy', () => {
   it('retries only transient network and server failures', () => {
     expect(isRetryableError(Object.assign(new Error('server'), { name: 'HttpError', status: 500 }))).toBe(true);
@@ -107,6 +117,54 @@ describe('partial download and retry behavior', () => {
       'export-manifest.json',
       expect.any(Blob)
     );
+  });
+
+  it('never counts a bypassed video item as anonymized (DM-016)', async () => {
+    const artifacts = {};
+    const mockWriter = {
+      name: 'mock-writer',
+      write: jest.fn().mockResolvedValue(undefined),
+      writeArtifact: jest.fn().mockImplementation(async (name, blob) => {
+        artifacts[name] = blob;
+      }),
+      finalize: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const videoItem = {
+      sopUid: 'video-sop-1',
+      seriesUid: 'series-1',
+      studyUid: 'study-1',
+      url: 'http://localhost/video-sop-1.mp4',
+      extension: 'mp4',
+      patientDir: 'ANON_P1',
+      studyDir: 'ANON_S1',
+      seriesDir: 'ANON_SE1',
+    };
+
+    const abortController = new AbortController();
+    const summary = await downloadManifest(
+      [videoItem],
+      mockWriter,
+      null,
+      abortController.signal,
+      { anonymize: true, patientName: 'ANON' }
+    );
+
+    expect(summary.status).toBe('complete');
+    expect(summary.notAnonymizedItems).toHaveLength(1);
+    expect(summary.notAnonymizedItems[0]).toMatchObject({
+      sopInstanceUid: 'video-sop-1',
+      contentType: 'mp4',
+    });
+    // The warning list is what the summary UI renders, so the exception has to
+    // reach it rather than only the manifest.
+    expect(summary.anonymizationWarnings).toHaveLength(1);
+    expect(summary.anonymizationWarnings[0]).toContain('NOT ANONYMIZED');
+
+    const manifestJson = JSON.parse(await readBlobText(artifacts['export-manifest.json']));
+    expect(manifestJson.anonymizationRequested).toBe(true);
+    expect(manifestJson.notAnonymized).toHaveLength(1);
+    expect(manifestJson.notAnonymized[0].sopInstanceUid).toBe('video-sop-1');
   });
 
   it('throws IncompleteExportError when 0 items succeed out of total', async () => {

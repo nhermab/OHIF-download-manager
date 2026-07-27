@@ -6,14 +6,25 @@
 import React, { useState, useMemo } from 'react';
 import { Button } from '@ohif/ui-next';
 import { formatBytes, formatDuration } from '../utils';
+import {
+  buildRunReport,
+  copyTextToClipboard,
+  groupFailuresBySeries,
+  itemIdentityLabel,
+} from '../report';
 
 interface DownloadSummaryViewProps {
   summary?: any;
   error?: any;
   issue?: any;
   logs?: Array<{ timestamp: string; message: string; type: string }>;
+  droppedLogCount?: number;
+  runId?: string;
+  startedAt?: number;
   onClose: () => void;
   onRetryFailed?: () => void;
+  onRetryAll?: () => void;
+  onBackToSelection?: () => void;
 }
 
 export function groupAnonymizationWarnings(anonWarnings: string[]) {
@@ -39,71 +50,118 @@ export default function DownloadSummaryView({
   error,
   issue,
   logs = [],
+  droppedLogCount = 0,
+  runId,
+  startedAt,
   onClose,
   onRetryFailed,
+  onRetryAll,
+  onBackToSelection,
 }: DownloadSummaryViewProps) {
   const [showFailedDetails, setShowFailedDetails] = useState(false);
   const [showAnonDetails, setShowAnonDetails] = useState(false);
   const [showErrorStackTrace, setShowErrorStackTrace] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   const doneCount = summary?.done || 0;
   const failedCount = summary?.failed || 0;
   const totalCount = summary?.total || 0;
 
-  const hasDoneFiles = doneCount > 0;
-  const hasFailedFiles = failedCount > 0;
-  const isPartialSuccess = hasDoneFiles && hasFailedFiles;
-  const isCompleteSuccess = hasDoneFiles && !hasFailedFiles && !error && !issue;
-  const isCancelled = summary?.cancelled;
-
   const failedItems = summary?.failedItems || [];
   const anonWarnings = summary?.anonymizationWarnings || [];
+  const notAnonymizedItems = summary?.notAnonymizedItems || [];
+
+  const hasDoneFiles = doneCount > 0;
+  const hasFailedFiles = failedCount > 0;
+
+  // Outcome resolution, most specific first. A green banner asserts both
+  // "saved" and "de-identified as requested" — anything less is downgraded.
+  const isCancelled = Boolean(summary?.cancelled);
+  const isFailure = !isCancelled && Boolean(error || issue || (!hasDoneFiles && totalCount > 0));
+  const isPartialSuccess = !isCancelled && !isFailure && hasDoneFiles && hasFailedFiles;
+  const isIncompleteAnonymization =
+    !isCancelled && !isFailure && !isPartialSuccess && hasDoneFiles && notAnonymizedItems.length > 0;
+  const isCompleteSuccess =
+    !isCancelled && !isFailure && !isPartialSuccess && !isIncompleteAnonymization && hasDoneFiles;
+
+  const tone: 'success' | 'warning' | 'destructive' = isCompleteSuccess
+    ? 'success'
+    : isFailure
+      ? 'destructive'
+      : 'warning';
+
+  const statusGlyph = isCompleteSuccess
+    ? '✅'
+    : isIncompleteAnonymization
+      ? '🛡️'
+      : isFailure
+        ? '❌'
+        : '⚠️';
+
+  const statusTitle = isCancelled
+    ? 'Download Cancelled'
+    : isCompleteSuccess
+      ? 'Download Complete'
+      : isIncompleteAnonymization
+        ? 'Completed — not fully de-identified'
+        : isPartialSuccess
+          ? 'Download Completed with Warnings'
+          : issue?.title || 'Download Failed';
+
+  const errorMessageText = error?.message || (typeof error === 'string' ? error : null);
+  const errorStackText =
+    error?.stack || (error && typeof error === 'object' ? JSON.stringify(error, null, 2) : null);
+
+  const statusDetail = isCancelled
+    ? `Download stopped. ${doneCount} of ${totalCount} files were saved prior to cancellation${
+        doneCount > 0 ? ' and are intact in your export destination' : ''
+      }.`
+    : isCompleteSuccess
+      ? `All ${doneCount} DICOM image file(s) were successfully saved and verified.`
+      : isIncompleteAnonymization
+        ? `${doneCount} file(s) saved, but ${notAnonymizedItems.length} of them were exported without de-identification and may still contain patient information.`
+        : isPartialSuccess
+          ? `${doneCount} of ${totalCount} files were saved. ${failedCount} file(s) failed but saved files are intact in your export.`
+          : issue?.message || errorMessageText || 'No files could be downloaded.';
 
   const groupedAnonWarnings = useMemo(
     () => groupAnonymizationWarnings(anonWarnings),
     [anonWarnings]
   );
 
-  const errorMessageText = error?.message || (typeof error === 'string' ? error : null);
-  const errorStackText = error?.stack || (error && typeof error === 'object' ? JSON.stringify(error, null, 2) : null);
+  const failureGroups = useMemo(() => groupFailuresBySeries(failedItems), [failedItems]);
+
+  const handleCopyReport = async () => {
+    const report = buildRunReport({ summary, error, issue, logs, runId, startedAt });
+    const copied = await copyTextToClipboard(report);
+    setCopyState(copied ? 'copied' : 'failed');
+    window.setTimeout(() => setCopyState('idle'), 4000);
+  };
 
   return (
     <div className="text-foreground space-y-4 p-1 text-sm">
       {/* Header Banner */}
       <div
+        role={isFailure ? 'alert' : 'status'}
+        aria-live={isFailure ? 'assertive' : 'polite'}
         className={`flex items-start gap-3 rounded border p-4 ${
-          isCompleteSuccess
+          tone === 'success'
             ? 'border-emerald-500/30 bg-emerald-500/10'
-            : isPartialSuccess
+            : tone === 'warning'
               ? 'border-amber-500/30 bg-amber-500/10'
-              : isCancelled
-                ? 'border-amber-500/30 bg-amber-500/10'
-                : 'border-destructive/40 bg-destructive/10'
+              : 'border-destructive/40 bg-destructive/10'
         }`}
       >
-        <div className="text-3xl">
-          {isCompleteSuccess ? '✅' : isPartialSuccess || isCancelled ? '⚠️' : '❌'}
+        <div
+          className="text-3xl"
+          aria-hidden="true"
+        >
+          {statusGlyph}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-foreground text-base font-semibold">
-            {isCompleteSuccess
-              ? 'Download Complete'
-              : isPartialSuccess
-                ? 'Download Completed with Warnings'
-                : isCancelled
-                  ? 'Download Cancelled'
-                  : issue?.title || 'Download Failed'}
-          </h3>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            {isCompleteSuccess
-              ? `All ${doneCount} DICOM image file(s) were successfully saved and verified.`
-              : isPartialSuccess
-                ? `${doneCount} of ${totalCount} files were saved. ${failedCount} file(s) failed but saved files are intact in your export.`
-                : isCancelled
-                  ? `Download stopped. ${doneCount} of ${totalCount} files were saved prior to cancellation.`
-                  : issue?.message || errorMessageText || 'No files could be downloaded.'}
-          </p>
+          <h3 className="text-foreground text-base font-semibold">{statusTitle}</h3>
+          <p className="text-muted-foreground mt-0.5 text-xs">{statusDetail}</p>
         </div>
       </div>
 
@@ -135,6 +193,31 @@ export default function DownloadSummaryView({
         </div>
       )}
 
+      {/* Un-anonymized instances — stated in full, never behind a collapsed card */}
+      {notAnonymizedItems.length > 0 && (
+        <div className="border-amber-500/40 bg-amber-500/10 text-foreground space-y-1.5 rounded border p-3 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-amber-500">
+            <span aria-hidden="true">🛡️</span>
+            <span>
+              {notAnonymizedItems.length} file(s) exported without de-identification
+            </span>
+          </div>
+          <p className="text-muted-foreground">
+            Anonymization was requested for this export, but these files have no de-identification
+            path in the viewer and were written exactly as retrieved. Patient identity may remain in
+            the frames, audio, or container metadata. Handle them as identifiable data.
+          </p>
+          <ul className="border-input bg-background max-h-32 select-text space-y-0.5 overflow-y-auto rounded border p-2 font-mono text-[11px]">
+            {notAnonymizedItems.map((entry: any, idx: number) => (
+              <li key={idx}>
+                {entry.fileName || entry.sopInstanceUid || `Item ${idx + 1}`}
+                {entry.contentType ? ` (${String(entry.contentType).toUpperCase()})` : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Terminal Issue Box */}
       {issue && (
         <div className="border-destructive/40 bg-destructive/10 text-foreground space-y-1 rounded border p-3 text-xs">
@@ -151,20 +234,21 @@ export default function DownloadSummaryView({
             <button
               type="button"
               onClick={() => setShowErrorStackTrace(!showErrorStackTrace)}
+              aria-expanded={showErrorStackTrace}
               className="text-primary hover:underline"
             >
               {showErrorStackTrace ? 'Hide stack trace' : 'View stack trace'}
             </button>
           </div>
           {showErrorStackTrace && (
-            <pre className="border-input bg-background text-destructive max-h-40 overflow-y-auto rounded border p-2 font-mono text-[11px]">
+            <pre className="border-input bg-background text-destructive max-h-40 select-text overflow-y-auto rounded border p-2 font-mono text-[11px]">
               {errorStackText}
             </pre>
           )}
         </div>
       )}
 
-      {/* Partial Failure Items Breakdown (Collapsed by default) */}
+      {/* Failed Items Breakdown, grouped by image set (Collapsed by default) */}
       {failedItems.length > 0 && (
         <div className="border-amber-500/30 bg-amber-500/5 space-y-2 rounded border p-3 text-xs">
           <div className="flex items-center justify-between">
@@ -175,6 +259,7 @@ export default function DownloadSummaryView({
             <button
               type="button"
               onClick={() => setShowFailedDetails(!showFailedDetails)}
+              aria-expanded={showFailedDetails}
               className="text-primary hover:underline"
             >
               {showFailedDetails ? 'Hide details' : 'View failed items'}
@@ -185,14 +270,39 @@ export default function DownloadSummaryView({
             The saved files are complete and usable. You can re-download only the missing items below.
           </p>
 
+          {/* Where the failures cluster — always visible, one line per image set */}
+          <ul className="text-muted-foreground space-y-1">
+            {failureGroups.map(group => (
+              <li
+                key={group.key}
+                className="flex items-start gap-1.5"
+              >
+                <span
+                  className="shrink-0 text-amber-500"
+                  aria-hidden="true"
+                >
+                  •
+                </span>
+                <span>
+                  <strong className="text-foreground">{group.count} file(s)</strong> missing from{' '}
+                  {group.label}
+                  {group.causes.length > 0 && (
+                    <span className="block">
+                      {group.causes
+                        .map(cause => `${cause.count}× ${cause.cause}`)
+                        .join(' · ')}
+                    </span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+
           {showFailedDetails && (
-            <div className="border-input bg-background max-h-40 space-y-1.5 overflow-y-auto rounded border p-2 font-mono text-[11px]">
+            <div className="border-input bg-background max-h-40 select-text space-y-1.5 overflow-y-auto rounded border p-2 font-mono text-[11px]">
               {failedItems.map((f: any, idx: number) => (
                 <div key={idx} className="border-b border-input/40 pb-1 last:border-b-0 last:pb-0">
-                  <div className="font-semibold text-foreground">
-                    {f.item?.patientDir ? `${f.item.patientDir} / ` : ''}
-                    {f.item?.sopUid ? `SOP: ${f.item.sopUid.slice(-12)}` : `Item ${idx + 1}`}
-                  </div>
+                  <div className="font-semibold text-foreground">{itemIdentityLabel(f.item)}</div>
                   <div className="text-destructive">{f.error || 'Unknown download error'}</div>
                 </div>
               ))}
@@ -207,7 +317,7 @@ export default function DownloadSummaryView({
                 size="sm"
                 className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
               >
-                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 Retry Failed Files ({failedItems.length})
@@ -232,6 +342,7 @@ export default function DownloadSummaryView({
               <button
                 type="button"
                 onClick={() => setShowAnonDetails(!showAnonDetails)}
+                aria-expanded={showAnonDetails}
                 className="text-primary hover:underline"
               >
                 {showAnonDetails ? 'Hide itemized log' : `View itemized log (${anonWarnings.length})`}
@@ -243,7 +354,7 @@ export default function DownloadSummaryView({
           <div className="space-y-1 text-muted-foreground">
             {groupedAnonWarnings.map((cat, i) => (
               <div key={i} className="flex items-start gap-1.5">
-                <span className="text-primary shrink-0">•</span>
+                <span className="text-primary shrink-0" aria-hidden="true">•</span>
                 <span>
                   {cat.count > 1 && (
                     <strong className="text-foreground mr-1">({cat.count} files)</strong>
@@ -275,6 +386,7 @@ export default function DownloadSummaryView({
             <button
               type="button"
               onClick={() => setShowLogs(!showLogs)}
+              aria-expanded={showLogs}
               className="text-primary hover:underline"
             >
               {showLogs ? 'Hide Log' : `Show Log (${logs.length} entries)`}
@@ -283,6 +395,12 @@ export default function DownloadSummaryView({
 
           {showLogs && (
             <div className="border-input bg-background text-muted-foreground max-h-48 select-text space-y-1 overflow-y-auto rounded border p-2.5 font-mono text-xs">
+              {droppedLogCount > 0 && (
+                <div className="text-muted-foreground italic">
+                  {droppedLogCount} earlier entries were trimmed from this view. Use Copy report for
+                  the retained log.
+                </div>
+              )}
               {logs.map((log, index) => {
                 const typeClass =
                   log.type === 'error'
@@ -292,9 +410,18 @@ export default function DownloadSummaryView({
                       : log.type === 'success'
                         ? 'text-emerald-500'
                         : 'text-muted-foreground';
+                const severityPrefix =
+                  log.type === 'error'
+                    ? 'ERROR'
+                    : log.type === 'warning'
+                      ? 'WARN'
+                      : log.type === 'success'
+                        ? 'OK'
+                        : 'INFO';
                 return (
                   <div key={index} className={`flex items-start gap-1.5 ${typeClass}`}>
                     <span className="text-muted-foreground shrink-0">[{log.timestamp}]</span>
+                    <span className="shrink-0 font-semibold">{severityPrefix}</span>
                     <span>{log.message}</span>
                   </div>
                 );
@@ -305,19 +432,56 @@ export default function DownloadSummaryView({
       )}
 
       {/* Footer Actions */}
-      <div className="border-input flex items-center justify-between border-t pt-3">
-        {onRetryFailed && failedItems.length > 0 ? (
+      <div className="border-input flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {onRetryFailed && failedItems.length > 0 && (
+            <Button
+              onClick={onRetryFailed}
+              variant="outline"
+              size="sm"
+              className="gap-1 text-amber-500 border-amber-500/40 hover:bg-amber-500/10"
+            >
+              Retry Failed Files ({failedItems.length})
+            </Button>
+          )}
+          {onRetryAll && (
+            <Button
+              onClick={onRetryAll}
+              variant="outline"
+              size="sm"
+              className="gap-1 text-amber-500 border-amber-500/40 hover:bg-amber-500/10"
+            >
+              Retry all files
+            </Button>
+          )}
+          {onBackToSelection && (
+            <Button
+              onClick={onBackToSelection}
+              variant="outline"
+              size="sm"
+            >
+              Back to selection
+            </Button>
+          )}
           <Button
-            onClick={onRetryFailed}
+            onClick={handleCopyReport}
             variant="outline"
             size="sm"
-            className="gap-1 text-amber-500 border-amber-500/40 hover:bg-amber-500/10"
           >
-            Retry Failed Files ({failedItems.length})
+            {copyState === 'copied'
+              ? 'Report copied'
+              : copyState === 'failed'
+                ? 'Copy failed — select the log manually'
+                : 'Copy report'}
           </Button>
-        ) : (
-          <div />
-        )}
+          <span
+            role="status"
+            aria-live="polite"
+            className="sr-only"
+          >
+            {copyState === 'copied' ? 'Export report copied to the clipboard.' : ''}
+          </span>
+        </div>
         <Button onClick={onClose}>Close</Button>
       </div>
     </div>

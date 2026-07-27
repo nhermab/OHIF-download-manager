@@ -41,6 +41,69 @@ export function isEncapsulatedTransferSyntax(tsUid) {
   );
 }
 
+/**
+ * Codec failure diagnostics (DM-027).
+ *
+ * Codec load/decode/encode failures must never disappear silently: a caller that
+ * sees `null` cannot otherwise distinguish "codec not installed" from "this frame
+ * is corrupt". Failures are recorded in a bounded ring buffer that carries no
+ * pixel or patient data — only the stage, transfer syntax, and error identity —
+ * so it is safe to surface in the export log. Console output stays opt-in
+ * (DM-017) and is enabled by the same verboseLogging setting as the rest of the
+ * extension.
+ */
+const CODEC_DIAGNOSTICS_LIMIT = 50;
+const codecDiagnostics = [];
+let codecVerboseLogging = false;
+
+export function setCodecVerboseLogging(enabled) {
+  codecVerboseLogging = enabled === true;
+}
+
+export function getCodecDiagnostics() {
+  return codecDiagnostics.slice();
+}
+
+export function clearCodecDiagnostics() {
+  codecDiagnostics.length = 0;
+}
+
+/**
+ * Record a codec failure. `stage` identifies the operation ("decode", "encode",
+ * "load") and `context` the transfer syntax or codec package involved. The error
+ * message is kept because codec errors describe the bitstream, not the patient.
+ */
+export function recordCodecFailure(stage, context, error) {
+  const entry = {
+    stage,
+    context: context || "",
+    name: (error && error.name) || "Error",
+    message: (error && error.message) || String(error || "unknown error"),
+  };
+  codecDiagnostics.push(entry);
+  if (codecDiagnostics.length > CODEC_DIAGNOSTICS_LIMIT) {
+    codecDiagnostics.shift();
+  }
+  if (codecVerboseLogging && typeof console !== "undefined") {
+    console.warn(`[download-manager] codec ${describeCodecFailure(entry)}`);
+  }
+  return entry;
+}
+
+function describeCodecFailure(entry) {
+  return `${entry.stage} failed for ${entry.context || "(unknown)"}: ${entry.name}: ${entry.message}`;
+}
+
+/**
+ * Human-readable summary of the most recent codec failure, or null when none
+ * has been recorded. Lets a caller explain why a fallback happened instead of
+ * reporting only that one did.
+ */
+export function describeLastCodecFailure() {
+  if (!codecDiagnostics.length) return null;
+  return describeCodecFailure(codecDiagnostics[codecDiagnostics.length - 1]);
+}
+
 // Global WASM Codec instances cache
 const codecCache = {
   openjpeg: null,
@@ -50,6 +113,11 @@ const codecCache = {
   jpegLossless: null,
 };
 
+// Each codec loader keeps its literal import/require specifiers inline: the
+// bundler needs them statically, and hoisting the `await import(...)` calls into
+// a shared helper changes how they are transformed and breaks WASM codec loading
+// under the test runner. Only the exhausted-all-attempts catch is extended, so a
+// missing codec package is distinguishable from a corrupt bitstream (DM-027).
 async function getOpenJPEGCodec() {
   if (codecCache.openjpeg) return codecCache.openjpeg;
   try {
@@ -71,7 +139,9 @@ async function getOpenJPEGCodec() {
           const openjpegRoot = require("@cornerstonejs/codec-openjpeg");
           const factory = openjpegRoot.default || openjpegRoot;
           codecCache.openjpeg = typeof factory === "function" ? await factory() : factory;
-        } catch (err2) {}
+        } catch (err2) {
+          recordCodecFailure("load", "@cornerstonejs/codec-openjpeg", err2);
+        }
       }
     }
   }
@@ -99,7 +169,9 @@ async function getCharLSCodec() {
           const charlsRoot = require("@cornerstonejs/codec-charls");
           const factory = charlsRoot.default || charlsRoot;
           codecCache.charls = typeof factory === "function" ? await factory() : factory;
-        } catch (err2) {}
+        } catch (err2) {
+          recordCodecFailure("load", "@cornerstonejs/codec-charls", err2);
+        }
       }
     }
   }
@@ -127,7 +199,9 @@ async function getOpenJPHCodec() {
           const openjphRoot = require("@cornerstonejs/codec-openjph");
           const factory = openjphRoot.default || openjphRoot;
           codecCache.openjph = typeof factory === "function" ? await factory() : factory;
-        } catch (err2) {}
+        } catch (err2) {
+          recordCodecFailure("load", "@cornerstonejs/codec-openjph", err2);
+        }
       }
     }
   }
@@ -155,7 +229,9 @@ async function getLibJPEGCodec() {
           const libjpegRoot = require("@cornerstonejs/codec-libjpeg-turbo-8bit");
           const factory = libjpegRoot.default || libjpegRoot;
           codecCache.libjpeg = typeof factory === "function" ? await factory() : factory;
-        } catch (err2) {}
+        } catch (err2) {
+          recordCodecFailure("load", "@cornerstonejs/codec-libjpeg-turbo-8bit", err2);
+        }
       }
     }
   }
@@ -171,7 +247,9 @@ async function getJPEGLosslessDecoder() {
     try {
       const pkg = require("jpeg-lossless-decoder-js");
       codecCache.jpegLossless = pkg.Decoder || pkg.default?.Decoder || pkg.default || pkg;
-    } catch (err) {}
+    } catch (err) {
+      recordCodecFailure("load", "jpeg-lossless-decoder-js", err);
+    }
   }
   return codecCache.jpegLossless;
 }
@@ -199,52 +277,50 @@ export function decodeRLEFrame(compressedBuffer, imageInfo) {
 
   const outInt8 = new Int8Array(outBuffer);
 
+  // PS3.5 G.2: segments are ordered by sample, and within a sample the most
+  // significant byte comes first. Output is sample-interleaved and little-endian,
+  // so segment s writes one fixed byte position of one sample, strided over the
+  // frame. This is the general form of the monochrome MSB/LSB pair and also
+  // covers multi-sample (colour) 16-bit data.
+  const stride = samplesPerPixel * bytesPerSample;
+
   for (let s = 0; s < numSegments; s++) {
-    let inIndex = dataView.getInt32((s + 1) * 4, true);
-    let maxIndex = dataView.getInt32((s + 2) * 4, true);
-    if (!maxIndex || maxIndex === 0 || maxIndex > raw.byteLength) {
-      maxIndex = raw.byteLength;
+    const segmentStart = dataView.getInt32((s + 1) * 4, true);
+    // The RLE header holds only 15 offsets, so the end of the final segment is
+    // the end of the fragment — reading "the next segment's offset" for it would
+    // read pixel bytes as if they were an offset.
+    let segmentEnd =
+      s === numSegments - 1 ? raw.byteLength : dataView.getInt32((s + 2) * 4, true);
+    if (!segmentEnd || segmentEnd > raw.byteLength || segmentEnd <= segmentStart) {
+      segmentEnd = raw.byteLength;
+    }
+    // Offsets are measured from the start of the 64-byte header; anything below
+    // that (typically an unused segment slot) has no data to decode.
+    if (segmentStart < 64 || segmentStart >= raw.byteLength) {
+      continue;
     }
 
-    if (bitsAllocated === 8) {
-      let outIndex = (samplesPerPixel === 3) ? s : s * frameElements;
-      const step = (samplesPerPixel === 3) ? 3 : 1;
-      while (inIndex < maxIndex && outIndex < outByteLength) {
-        const n = int8Data[inIndex++];
-        if (n >= 0 && n <= 127) {
-          const count = n + 1;
-          for (let i = 0; i < count && inIndex < maxIndex && outIndex < outByteLength; i++) {
-            outInt8[outIndex] = int8Data[inIndex++];
-            outIndex += step;
-          }
-        } else if (n <= -1 && n >= -127) {
-          const count = -n + 1;
-          const val = int8Data[inIndex++];
-          for (let j = 0; j < count && outIndex < outByteLength; j++) {
-            outInt8[outIndex] = val;
-            outIndex += step;
-          }
+    const sampleIndex = Math.floor(s / bytesPerSample);
+    const byteInSample = s % bytesPerSample;
+    const baseOffset =
+      sampleIndex * bytesPerSample + (bytesPerSample - 1 - byteInSample);
+
+    let inIndex = segmentStart;
+    let pixel = 0;
+    while (inIndex < segmentEnd && pixel < frameElements) {
+      const n = int8Data[inIndex++];
+      if (n >= 0 && n <= 127) {
+        const count = n + 1;
+        for (let i = 0; i < count && inIndex < segmentEnd && pixel < frameElements; i++) {
+          outInt8[pixel * stride + baseOffset] = int8Data[inIndex++];
+          pixel++;
         }
-      }
-    } else if (bitsAllocated === 16) {
-      // s=0 is MSB, s=1 is LSB (for monochrome)
-      const highByte = (s === 0) ? 1 : 0;
-      let outIndex = 0;
-      while (inIndex < maxIndex && outIndex < frameElements) {
-        const n = int8Data[inIndex++];
-        if (n >= 0 && n <= 127) {
-          const count = n + 1;
-          for (let i = 0; i < count && inIndex < maxIndex && outIndex < frameElements; i++) {
-            outInt8[outIndex * 2 + highByte] = int8Data[inIndex++];
-            outIndex++;
-          }
-        } else if (n <= -1 && n >= -127) {
-          const count = -n + 1;
-          const val = int8Data[inIndex++];
-          for (let j = 0; j < count && outIndex < frameElements; j++) {
-            outInt8[outIndex * 2 + highByte] = val;
-            outIndex++;
-          }
+      } else if (n <= -1 && n >= -127) {
+        const count = -n + 1;
+        const val = int8Data[inIndex++];
+        for (let j = 0; j < count && pixel < frameElements; j++) {
+          outInt8[pixel * stride + baseOffset] = val;
+          pixel++;
         }
       }
     }
@@ -264,8 +340,21 @@ export function encodeRLEFrame(pixelArray, imageInfo) {
   const bytesPerSample = Math.ceil(bitsAllocated / 8);
   const numSegments = bytesPerSample * samplesPerPixel;
 
+  // The RLE header carries at most 15 segment offsets (PS3.5 G.2).
+  if (numSegments < 1 || numSegments > 15) {
+    throw new Error(
+      `RLE requires 1-15 segments, got ${numSegments} for ${bitsAllocated} bits / ${samplesPerPixel} samples`
+    );
+  }
+
   const header = new DataView(new ArrayBuffer(64));
   header.setInt32(0, numSegments, true);
+
+  const srcBytes = new Uint8Array(
+    pixelArray.buffer,
+    pixelArray.byteOffset,
+    pixelArray.byteLength
+  );
 
   const segmentBuffers = [];
   let currentOffset = 64;
@@ -273,20 +362,17 @@ export function encodeRLEFrame(pixelArray, imageInfo) {
   for (let s = 0; s < numSegments; s++) {
     header.setInt32((s + 1) * 4, currentOffset, true);
 
+    // Mirror of the decoder: segment s carries one byte position of one sample,
+    // samples in order and most significant byte first, read from the
+    // sample-interleaved little-endian source frame.
+    const sampleIndex = Math.floor(s / bytesPerSample);
+    const byteInSample = s % bytesPerSample;
+    const byteOffsetInSample = bytesPerSample - 1 - byteInSample;
+
     const plane = new Uint8Array(frameElements);
-    if (bitsAllocated === 8) {
-      if (samplesPerPixel === 1) {
-        for (let i = 0; i < frameElements; i++) plane[i] = pixelArray[i];
-      } else {
-        for (let i = 0; i < frameElements; i++) plane[i] = pixelArray[i * samplesPerPixel + s];
-      }
-    } else if (bitsAllocated === 16) {
-      const isMSB = (s === 0);
-      const view = new DataView(pixelArray.buffer, pixelArray.byteOffset, pixelArray.byteLength);
-      for (let i = 0; i < frameElements; i++) {
-        const val = view.getUint16(i * 2, true);
-        plane[i] = isMSB ? ((val >> 8) & 0xff) : (val & 0xff);
-      }
+    for (let i = 0; i < frameElements; i++) {
+      plane[i] =
+        srcBytes[(i * samplesPerPixel + sampleIndex) * bytesPerSample + byteOffsetInSample];
     }
 
     const compressedPlane = packBitsCompress(plane);
@@ -349,7 +435,7 @@ export async function decodeDicomFrame(compressedBuffer, transferSyntax, imageIn
   if (ts === TRANSFER_SYNTAX_UIDS.RLE_LOSSLESS) {
     try {
       return decodeRLEFrame(rawBytes, imageInfo);
-    } catch (e) {}
+    } catch (e) { recordCodecFailure("decode", ts, e); }
   }
 
   // 2. JPEG 2000 (Lossless & Lossy)
@@ -367,7 +453,7 @@ export async function decodeDicomFrame(compressedBuffer, transferSyntax, imageIn
         const frameInfo = decoder.getFrameInfo();
         const decodedBufferInWASM = decoder.getDecodedBuffer();
         return createTypedArrayFromBuffer(decodedBufferInWASM, frameInfo, imageInfo);
-      } catch (e) {}
+      } catch (e) { recordCodecFailure("decode", ts, e); }
     }
   }
 
@@ -386,7 +472,7 @@ export async function decodeDicomFrame(compressedBuffer, transferSyntax, imageIn
         const frameInfo = decoder.getFrameInfo();
         const decodedBufferInWASM = decoder.getDecodedBuffer();
         return createTypedArrayFromBuffer(decodedBufferInWASM, frameInfo, imageInfo);
-      } catch (e) {}
+      } catch (e) { recordCodecFailure("decode", ts, e); }
     }
   }
 
@@ -406,7 +492,7 @@ export async function decodeDicomFrame(compressedBuffer, transferSyntax, imageIn
         const frameInfo = decoder.getFrameInfo();
         const decodedBufferInWASM = decoder.getDecodedBuffer();
         return createTypedArrayFromBuffer(decodedBufferInWASM, frameInfo, imageInfo);
-      } catch (e) {}
+      } catch (e) { recordCodecFailure("decode", ts, e); }
     }
   }
 
@@ -434,7 +520,7 @@ export async function decodeDicomFrame(compressedBuffer, transferSyntax, imageIn
         return imageInfo.bitsAllocated <= 8
           ? new Uint8Array(decompressedData.buffer)
           : new Uint16Array(decompressedData.buffer);
-      } catch (e) {}
+      } catch (e) { recordCodecFailure("decode", ts, e); }
     }
   }
 
@@ -453,7 +539,7 @@ export async function decodeDicomFrame(compressedBuffer, transferSyntax, imageIn
         const frameInfo = decoder.getFrameInfo();
         const decodedBufferInWASM = decoder.getDecodedBuffer();
         return createTypedArrayFromBuffer(decodedBufferInWASM, frameInfo, imageInfo);
-      } catch (e) {}
+      } catch (e) { recordCodecFailure("decode", ts, e); }
     }
   }
 
@@ -473,7 +559,7 @@ export async function encodeDicomFrame(pixelTypedArray, targetTransferSyntax, im
   if (ts === TRANSFER_SYNTAX_UIDS.RLE_LOSSLESS) {
     try {
       return encodeRLEFrame(pixelTypedArray, imageInfo);
-    } catch (e) {}
+    } catch (e) { recordCodecFailure("encode", ts, e); }
   }
 
   // 2. JPEG-LS (1.2.840.10008.1.2.4.80 or .81)
@@ -498,7 +584,7 @@ export async function encodeDicomFrame(pixelTypedArray, targetTransferSyntax, im
         encoder.encode();
         const encodedBuffer = encoder.getEncodedBuffer();
         return new Uint8Array(encodedBuffer.buffer, encodedBuffer.byteOffset, encodedBuffer.byteLength);
-      } catch (e) {}
+      } catch (e) { recordCodecFailure("encode", ts, e); }
     }
   }
 
@@ -524,7 +610,7 @@ export async function encodeDicomFrame(pixelTypedArray, targetTransferSyntax, im
         encoder.encode();
         const encodedBuffer = encoder.getEncodedBuffer();
         return new Uint8Array(encodedBuffer.buffer, encodedBuffer.byteOffset, encodedBuffer.byteLength);
-      } catch (e) {}
+      } catch (e) { recordCodecFailure("encode", ts, e); }
     }
   }
 
@@ -552,7 +638,7 @@ export async function encodeDicomFrame(pixelTypedArray, targetTransferSyntax, im
         encoder.encode();
         const encodedBuffer = encoder.getEncodedBuffer();
         return new Uint8Array(encodedBuffer.buffer, encodedBuffer.byteOffset, encodedBuffer.byteLength);
-      } catch (e) {}
+      } catch (e) { recordCodecFailure("encode", ts, e); }
     }
   }
 
@@ -563,6 +649,12 @@ export async function encodeDicomFrame(pixelTypedArray, targetTransferSyntax, im
 
 /**
  * Encapsulate Array of Frame Byte Buffers into DICOM Encapsulated Pixel Sequence (7FE0,0010)
+ *
+ * Every Item in an encapsulated Pixel Data element carries an Item Length that
+ * must be even (PS3.5 A.4, PS3.5 7.5). Codec output is not guaranteed to be an
+ * even number of bytes, so each fragment is trailing-padded with a single null
+ * byte when needed. Encapsulated streams tolerate trailing padding: JPEG/JPEG-LS/
+ * JPEG 2000 decoders stop at their own end-of-stream marker.
  */
 export function encapsulateFrameBuffers(frameBuffers) {
   const result = [new ArrayBuffer(0)]; // Item 0: Basic Offset Table (BOT)
@@ -570,7 +662,13 @@ export function encapsulateFrameBuffers(frameBuffers) {
     const arrayBuffer = ArrayBuffer.isView(buf)
       ? buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
       : buf;
-    result.push(arrayBuffer);
+    if (arrayBuffer.byteLength % 2 !== 0) {
+      const padded = new ArrayBuffer(arrayBuffer.byteLength + 1);
+      new Uint8Array(padded).set(new Uint8Array(arrayBuffer));
+      result.push(padded); // trailing byte is already 0
+    } else {
+      result.push(arrayBuffer);
+    }
   }
   return result;
 }

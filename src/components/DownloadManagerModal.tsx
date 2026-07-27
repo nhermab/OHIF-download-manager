@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ScrollArea } from '@ohif/ui-next';
 import { currentPayload, state as globalState } from '../state';
 import {
@@ -22,6 +22,7 @@ import {
 } from '../anonymizer-config';
 import { startDownload, canUseFolderWriter, defaultOutputMethod } from '../downloader';
 import { getDownloadAvailabilityMessage } from '../ohif-state';
+import { config } from '../config';
 
 import SeriesList from './SeriesList';
 import DownloadProgressView from './DownloadProgressView';
@@ -31,21 +32,31 @@ import AnonymizerPanel from './AnonymizerPanel';
 interface DownloadManagerModalProps {
   hideModal?: () => void;
   servicesManager?: any;
+  /** Injected by ModalProvider — updates the host dialog's options in place. */
+  show?: (options: Record<string, unknown>) => void;
 }
+
+/**
+ * The activity log is unbounded in the engine (one line per file). Keeping all
+ * of it in React state re-renders the whole list on every file, so the view
+ * keeps a bounded tail and reports how much was trimmed.
+ */
+const MAX_LOG_ENTRIES = 500;
+const LOG_FLUSH_MS = 250;
 
 export default function DownloadManagerModal({
   hideModal,
   servicesManager,
+  show,
 }: DownloadManagerModalProps) {
-  const payload = useMemo(() => currentPayload(), []);
-  const studies = payload?.studies || [];
+  const [payload, setPayload] = useState<any>(() => currentPayload());
+  const studies = useMemo(() => payload?.studies || [], [payload]);
   const allSeries = useMemo(() => flattenSeries(studies), [studies]);
   const modalities = useMemo(() => availableModalities(allSeries), [allSeries]);
 
-  const totalFilesAvailable = useMemo(
-    () => allSeries.reduce((sum, s) => sum + buildManifest([s]).length, 0),
-    [allSeries]
-  );
+  // Counted from one manifest pass so the "x of y" totals cannot disagree with
+  // the selected count below, which is built the same way.
+  const totalFilesAvailable = useMemo(() => buildManifest(allSeries).length, [allSeries]);
 
   const [step, setStep] = useState<
     'selection' | 'downloading' | 'complete' | 'error' | 'unavailable'
@@ -61,25 +72,129 @@ export default function DownloadManagerModal({
   const [identifiedExportConfirmed, setIdentifiedExportConfirmed] = useState(false);
   const [outputMethod, setOutputMethod] = useState<'folder' | 'zip'>(() => defaultOutputMethod());
   const folderWriterAvailable = canUseFolderWriter();
+  const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
+  const [availabilityNotice, setAvailabilityNotice] = useState<string | null>(null);
 
   // Download Progress state
   const [downloadStats, setDownloadStats] = useState<any>(null);
   const [downloadLogs, setDownloadLogs] = useState<
     Array<{ timestamp: string; message: string; type: string }>
   >([]);
+  const [droppedLogCount, setDroppedLogCount] = useState(0);
   const [downloadSummary, setDownloadSummary] = useState<any>(null);
   const [downloadError, setDownloadError] = useState<any>(null);
   const [downloadIssue, setDownloadIssue] = useState<any>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+
+  // Progress arrives faster than React state settles; the outcome handlers need
+  // the latest counts synchronously.
+  const statsRef = useRef<any>(null);
+  const lastRunItemsRef = useRef<any[]>([]);
+
+  const logsRef = useRef<Array<{ timestamp: string; message: string; type: string }>>([]);
+  const pendingLogsRef = useRef<Array<{ timestamp: string; message: string; type: string }>>([]);
+  const droppedLogsRef = useRef(0);
+  const flushTimerRef = useRef<number | null>(null);
+
+  const flushLogs = useCallback(() => {
+    flushTimerRef.current = null;
+    const pending = pendingLogsRef.current;
+    if (!pending.length) {
+      return;
+    }
+    pendingLogsRef.current = [];
+
+    let next = logsRef.current.concat(pending);
+    if (next.length > MAX_LOG_ENTRIES) {
+      droppedLogsRef.current += next.length - MAX_LOG_ENTRIES;
+      next = next.slice(next.length - MAX_LOG_ENTRIES);
+      setDroppedLogCount(droppedLogsRef.current);
+    }
+    logsRef.current = next;
+    setDownloadLogs(next);
+  }, []);
+
+  const scheduleLogFlush = useCallback(() => {
+    if (flushTimerRef.current === null) {
+      flushTimerRef.current = window.setTimeout(flushLogs, LOG_FLUSH_MS);
+    }
+  }, [flushLogs]);
+
+  const resetLogs = useCallback(() => {
+    if (flushTimerRef.current !== null) {
+      window.clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    pendingLogsRef.current = [];
+    logsRef.current = [];
+    droppedLogsRef.current = 0;
+    setDownloadLogs([]);
+    setDroppedLogCount(0);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current !== null) {
+        window.clearTimeout(flushTimerRef.current);
+      }
+    };
+  }, []);
+
+  // An export in flight must not be dismissed by ESC or an overlay click: the
+  // engine would keep running with no surface reporting it.
+  useEffect(() => {
+    if (typeof show !== 'function') {
+      return;
+    }
+    const isBusy = step === 'downloading';
+    show({ shouldCloseOnEsc: !isBusy, shouldCloseOnOverlayClick: !isBusy });
+  }, [show, step]);
+
+  const notify = useCallback(
+    (title: string, message: string, type: 'success' | 'warning' | 'error' | 'info') => {
+      const notificationService = servicesManager?.services?.uiNotificationService;
+      notificationService?.show?.({
+        title,
+        message,
+        type,
+        duration: type === 'error' ? 10000 : 5000,
+      });
+    },
+    [servicesManager]
+  );
+
+  const closeModal = useCallback(() => {
+    if (typeof show === 'function') {
+      show({ shouldCloseOnEsc: true, shouldCloseOnOverlayClick: true });
+    }
+    if (hideModal) {
+      hideModal();
+    } else if (servicesManager?.services?.uiModalService) {
+      servicesManager.services.uiModalService.hide();
+    }
+  }, [hideModal, servicesManager, show]);
 
   const handleClose = () => {
     if (globalState.activeAbortController) {
       globalState.activeAbortController.abort();
       globalState.activeAbortController = null;
     }
-    if (hideModal) {
-      hideModal();
-    } else if (servicesManager?.services?.uiModalService) {
-      servicesManager.services.uiModalService.hide();
+    closeModal();
+  };
+
+  const handleCheckAvailability = () => {
+    const nextPayload = currentPayload();
+    const nextSeries = flattenSeries(nextPayload?.studies || []);
+    setPayload(nextPayload);
+    if (nextSeries.length) {
+      setSelectedSeriesIds(new Set(nextSeries.map(s => s.id)));
+      setAvailabilityNotice(null);
+      setStep('selection');
+    } else {
+      setAvailabilityNotice(
+        'The viewer still reports no downloadable images. Wait for the study to finish loading, then check again.'
+      );
     }
   };
 
@@ -143,14 +258,32 @@ export default function DownloadManagerModal({
     return allSeries.filter(s => selectedSeriesIds.has(s.id));
   }, [allSeries, selectedSeriesIds]);
 
-  const selectedFilesCount = useMemo(() => {
-    return selectedSeriesList.reduce((sum, s) => sum + buildManifest([s]).length, 0);
-  }, [selectedSeriesList]);
+  const selectedManifest = useMemo(
+    () => buildManifest(selectedSeriesList),
+    [selectedSeriesList]
+  );
+
+  const selectedFilesCount = selectedManifest.length;
+
+  const nonDicomSelectedCount = useMemo(
+    () =>
+      selectedManifest.filter(
+        item => item.extension && item.extension !== 'dcm' && item.extension !== 'dicom'
+      ).length,
+    [selectedManifest]
+  );
 
   const manifestErrors = useMemo(
     () => validateManifestSelection(selectedSeriesList),
     [selectedSeriesList]
   );
+
+  // The ZIP writer refuses to emit a partial multi-part archive, so an export
+  // over the entry limit fails after every file has been fetched. The limit is
+  // exact and known here: say so before the run instead of an hour into it.
+  const zipMaxEntries = useMemo(() => Number(config().zipMaxEntries) || 60000, []);
+  const exceedsZipEntryLimit =
+    outputMethod === 'zip' && selectedFilesCount + 2 > zipMaxEntries;
 
   const modalitySelections = useMemo(
     () =>
@@ -184,42 +317,159 @@ export default function DownloadManagerModal({
     resolve: (method: string) => void;
   } | null>(null);
 
+  const multiFramePromptRef = useRef<HTMLDivElement>(null);
+
+  // The prompt blocks every worker, so it must not be possible to miss it in a
+  // scrolled log.
+  useEffect(() => {
+    if (!multiFramePrompt || !multiFramePromptRef.current) {
+      return;
+    }
+    multiFramePromptRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const firstButton = multiFramePromptRef.current.querySelector('button');
+    if (firstButton instanceof HTMLElement) {
+      firstButton.focus();
+    }
+  }, [multiFramePrompt]);
+
   const handleStartDownload = (customTargetItems?: any) => {
     const itemsToDownload = Array.isArray(customTargetItems)
       ? customTargetItems
       : selectedSeriesList;
     if (!itemsToDownload || itemsToDownload.length === 0) return;
 
+    lastRunItemsRef.current = itemsToDownload;
+    statsRef.current = null;
+
     setStep('downloading');
-    setDownloadLogs([]);
+    resetLogs();
+    // Reset every artefact of the previous run together: a stale summary under a
+    // fresh error banner mixes two runs on one screen.
+    setDownloadStats(null);
+    setDownloadSummary(null);
     setDownloadError(null);
     setDownloadIssue(null);
     setMultiFramePrompt(null);
+    setConfirmCancel(false);
+    setSelectionNotice(null);
+    setRunStartedAt(Date.now());
+    globalState.downloadIssue = null;
 
     const targetCallbacks = {
       onProgress: (stats: any) => {
+        statsRef.current = stats;
         setDownloadStats(stats);
       },
       onLog: (logEntry: { timestamp: string; message: string; type: string }) => {
-        setDownloadLogs(prev => [...prev, logEntry]);
+        pendingLogsRef.current.push(logEntry);
+        scheduleLogFlush();
       },
       onComplete: (summary: any) => {
+        flushLogs();
         setDownloadSummary(summary);
         setStep('complete');
         setMultiFramePrompt(null);
+        setConfirmCancel(false);
+
+        const notAnonymized = summary?.notAnonymizedItems?.length || 0;
+        if (summary?.failed > 0) {
+          notify(
+            'Download completed with failures',
+            `${summary.done} of ${summary.total} files were saved. ${summary.failed} file(s) failed.`,
+            'warning'
+          );
+        } else if (notAnonymized > 0) {
+          notify(
+            'Download completed — not fully de-identified',
+            `${summary.done} file(s) saved, of which ${notAnonymized} were exported without de-identification.`,
+            'warning'
+          );
+        } else {
+          notify('Download complete', `${summary?.done || 0} file(s) were saved.`, 'success');
+        }
       },
       onError: (err: any, issue: any) => {
+        flushLogs();
+        setMultiFramePrompt(null);
+        setConfirmCancel(false);
+
+        const stats = statsRef.current;
+        const isUserAbort = err?.name === 'AbortError' && !issue;
+
+        if (isUserAbort && !stats?.writer) {
+          // The destination picker was dismissed before anything was fetched.
+          // That is a change of mind, not a failure — keep the configuration.
+          setStep('selection');
+          setSelectionNotice(
+            'No destination was chosen, so nothing was downloaded. Your selection and settings are unchanged.'
+          );
+          return;
+        }
+
+        if (isUserAbort) {
+          // Render the cancelled outcome instead of a red failure banner, and
+          // account for the files already written to the destination.
+          setDownloadSummary({
+            cancelled: true,
+            done: stats?.done || 0,
+            failed: stats?.failed || 0,
+            total: stats?.total || 0,
+            totalBytes: stats?.totalBytes || 0,
+            durationMs: stats?.startTime ? Date.now() - stats.startTime : 0,
+            status: 'cancelled',
+            failedItems: [],
+            anonymizationWarnings: [],
+            notAnonymizedItems: [],
+          });
+          setDownloadError(null);
+          setDownloadIssue(null);
+          setStep('complete');
+          notify(
+            'Download cancelled',
+            `${stats?.done || 0} of ${stats?.total || 0} files were saved before the download stopped.`,
+            'warning'
+          );
+          return;
+        }
+
         setDownloadError(err);
         setDownloadIssue(issue);
         setStep('error');
-        setMultiFramePrompt(null);
+        notify(
+          issue?.title || 'Download failed',
+          issue?.message || err?.message || 'The export could not be completed.',
+          'error'
+        );
       },
       onPromptMultiFrame: ({ numberOfFrames }: any, resolve: (method: string) => void) => {
         setMultiFramePrompt({ numberOfFrames, resolve });
       },
     };
 
-    startDownload(targetCallbacks, itemsToDownload, anonEnabled ? anonConfig : null, outputMethod);
+    const started = startDownload(
+      targetCallbacks,
+      itemsToDownload,
+      anonEnabled ? anonConfig : null,
+      outputMethod
+    );
+
+    // startDownload rejects synchronously when an export is already running;
+    // without this the modal would sit on a progress view that never updates.
+    if (started && typeof started.catch === 'function') {
+      started.catch((err: any) => {
+        if (err?.name === 'ExportInProgressError') {
+          setStep('selection');
+          setSelectionNotice(
+            'Another export is still running. Wait for it to finish, or cancel it from the Download Manager panel, and then start this one.'
+          );
+          notify('Export already running', 'Only one export can run at a time.', 'warning');
+          return;
+        }
+        setDownloadError(err);
+        setDownloadIssue(null);
+        setStep('error');
+      });
+    }
   };
 
   const handleRetryFailed = () => {
@@ -228,6 +478,33 @@ export default function DownloadManagerModal({
       handleStartDownload(failedItems);
     }
   };
+
+  const handleRetryAll = () => {
+    if (lastRunItemsRef.current?.length) {
+      handleStartDownload(lastRunItemsRef.current);
+    }
+  };
+
+  const handleBackToSelection = () => {
+    setStep('selection');
+    setDownloadError(null);
+    setDownloadIssue(null);
+    setDownloadSummary(null);
+    setDownloadStats(null);
+    setSelectionNotice(null);
+  };
+
+  const handleRequestCancel = () => setConfirmCancel(true);
+
+  const handleConfirmCancel = () => {
+    setConfirmCancel(false);
+    if (globalState.activeAbortController) {
+      globalState.activeAbortController.abort();
+    }
+  };
+
+  const showBackToSelection =
+    step === 'error' || Boolean(downloadSummary?.cancelled) || downloadSummary?.failed > 0;
 
   return (
     <div className="text-foreground flex h-[calc(90vh-6.5rem)] max-h-[796px] min-h-0 flex-col">
@@ -244,14 +521,37 @@ export default function DownloadManagerModal({
       >
         <div className="space-y-4 pb-1">
           {step === 'unavailable' && (
-            <div className="border-primary/30 bg-primary/10 text-foreground rounded border p-4 text-sm">
-              {getDownloadAvailabilityMessage() ||
-                'Your medical images are not ready yet. Please wait until the viewer finishes loading, then try again.'}
+            <div
+              className="border-primary/30 bg-primary/10 text-foreground space-y-3 rounded border p-4 text-sm"
+              role="status"
+            >
+              <p>
+                {availabilityNotice ||
+                  getDownloadAvailabilityMessage() ||
+                  'Your medical images are not ready yet. Please wait until the viewer finishes loading, then check again.'}
+              </p>
+              <Button
+                onClick={handleCheckAvailability}
+                variant="outline"
+                size="sm"
+              >
+                Check again
+              </Button>
             </div>
           )}
 
           {step === 'selection' && (
             <div className="space-y-4">
+              {selectionNotice && (
+                <div
+                  className="border-primary/30 bg-primary/10 text-foreground rounded border p-3 text-sm"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {selectionNotice}
+                </div>
+              )}
+
               {folderWriterAvailable && (
                 <div className="border-primary/30 bg-primary/10 text-muted-foreground flex items-start gap-2 rounded border p-3 text-sm">
                   <span aria-hidden="true">📁</span>
@@ -443,8 +743,54 @@ export default function DownloadManagerModal({
                 </label>
               )}
 
+              {/* Warn before the export, not in the summary afterwards. */}
+              {anonEnabled && nonDicomSelectedCount > 0 && (
+                <div className="border-amber-500/40 bg-amber-500/10 text-foreground flex items-start gap-2 rounded border p-3 text-sm">
+                  <span aria-hidden="true">🛡️</span>
+                  <span>
+                    <strong>
+                      {nonDicomSelectedCount} selected file(s) cannot be de-identified.
+                    </strong>{' '}
+                    Video and other non-DICOM payloads have no de-identification path here and will
+                    be exported exactly as retrieved, so patient identity may remain in the frames,
+                    audio, or container metadata. Deselect them if the export must be fully
+                    de-identified.
+                  </span>
+                </div>
+              )}
+
+              {exceedsZipEntryLimit && (
+                <div
+                  className="border-destructive/50 bg-destructive/10 text-foreground space-y-2 rounded border p-3 text-sm"
+                  role="alert"
+                >
+                  <p>
+                    <strong>
+                      This selection is too large for a single ZIP archive ({selectedFilesCount}{' '}
+                      files, limit {zipMaxEntries}).
+                    </strong>{' '}
+                    The archive would be rejected only after every file had been downloaded, so the
+                    export is blocked here instead.
+                  </p>
+                  {folderWriterAvailable ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setOutputMethod('folder')}
+                    >
+                      Save to a folder instead
+                    </Button>
+                  ) : (
+                    <p>Reduce the selection to continue.</p>
+                  )}
+                </div>
+              )}
+
               {manifestErrors.length > 0 && (
-                <div className="border-destructive/50 bg-destructive/10 text-foreground rounded border p-3 text-sm">
+                <div
+                  className="border-destructive/50 bg-destructive/10 text-foreground rounded border p-3 text-sm"
+                  role="alert"
+                >
                   <strong>This selection cannot be exported.</strong>
                   <ul className="mt-1 list-inside list-disc">
                     {manifestErrors.map(error => (
@@ -473,14 +819,21 @@ export default function DownloadManagerModal({
           {step === 'downloading' && (
             <div className="space-y-4">
               {multiFramePrompt && (
-                <div className="border-amber-500/40 bg-amber-500/10 text-foreground space-y-2 rounded border p-3 text-xs">
+                <div
+                  ref={multiFramePromptRef}
+                  role="alert"
+                  aria-live="assertive"
+                  className="border-amber-500/40 bg-amber-500/10 text-foreground space-y-2 rounded border p-3 text-xs"
+                >
                   <div className="flex items-center gap-2 font-semibold text-amber-500">
-                    <span>⚠️</span>
+                    <span aria-hidden="true">⚠️</span>
                     <span>Multi-Frame DICOM Redaction Mode Required</span>
                   </div>
                   <p>
-                    A multi-frame DICOM instance ({multiFramePrompt.numberOfFrames} frames) with burned-in annotations was detected.
-                    Select how pixel redaction should scan these frames:
+                    A multi-frame DICOM instance ({multiFramePrompt.numberOfFrames} frames) with
+                    burned-in annotations was detected. The export is paused until you choose how
+                    pixel redaction should scan these frames. Your choice applies to every
+                    multi-frame instance in this export.
                   </p>
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     <Button
@@ -507,10 +860,45 @@ export default function DownloadManagerModal({
                   </div>
                 </div>
               )}
+
+              {confirmCancel && (
+                <div
+                  role="alertdialog"
+                  aria-label="Stop the download?"
+                  className="border-amber-500/40 bg-amber-500/10 text-foreground space-y-2 rounded border p-3 text-sm"
+                >
+                  <p>
+                    <strong>Stop this download?</strong>{' '}
+                    {downloadStats
+                      ? `${downloadStats.done || 0} of ${downloadStats.total || 0} files have already been saved to your destination and will stay there.`
+                      : 'Nothing has been saved yet.'}{' '}
+                    The remaining files will not be downloaded.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleConfirmCancel}
+                      className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                    >
+                      Stop download
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setConfirmCancel(false)}
+                    >
+                      Continue downloading
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <DownloadProgressView
                 stats={downloadStats}
                 logs={downloadLogs}
-                onCancel={handleClose}
+                droppedLogCount={droppedLogCount}
+                awaitingInput={Boolean(multiFramePrompt)}
+                onCancel={handleRequestCancel}
               />
             </div>
           )}
@@ -521,8 +909,18 @@ export default function DownloadManagerModal({
               error={downloadError}
               issue={downloadIssue}
               logs={downloadLogs}
+              droppedLogCount={droppedLogCount}
+              startedAt={runStartedAt || undefined}
               onClose={handleClose}
               onRetryFailed={downloadSummary?.failedItems?.length > 0 ? handleRetryFailed : undefined}
+              onRetryAll={
+                step === 'error' &&
+                !downloadSummary?.failedItems?.length &&
+                lastRunItemsRef.current?.length
+                  ? handleRetryAll
+                  : undefined
+              }
+              onBackToSelection={showBackToSelection ? handleBackToSelection : undefined}
             />
           )}
         </div>
@@ -538,12 +936,18 @@ export default function DownloadManagerModal({
             Cancel
           </Button>
           <Button
-            onClick={handleStartDownload}
-            disabled={selectedFilesCount === 0 || (!anonEnabled && !identifiedExportConfirmed) || manifestErrors.length > 0}
+            onClick={() => handleStartDownload()}
+            disabled={
+              selectedFilesCount === 0 ||
+              (!anonEnabled && !identifiedExportConfirmed) ||
+              manifestErrors.length > 0 ||
+              exceedsZipEntryLimit
+            }
             className="gap-1.5"
           >
             <svg
               className="h-4 w-4"
+              aria-hidden="true"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

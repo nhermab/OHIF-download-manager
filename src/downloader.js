@@ -289,6 +289,7 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
 
   const failedItems = [];
   const anonymizationWarnings = [];
+  const notAnonymizedItems = [];
   let doneCount = 0;
   let failedCount = 0;
 
@@ -345,6 +346,32 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
     updateProgress(dialog, stats);
   }
 
+  /**
+   * DM-016: record an item that was exported without de-identification.
+   *
+   * Video and other non-DICOM payloads have no attribute-level or pixel-level
+   * de-identification path in this extension, so they are written exactly as
+   * retrieved. They must never be silently counted as anonymized: the exception
+   * is logged, surfaced in the summary warnings, and recorded in the export
+   * manifest.
+   */
+  function recordNotAnonymized(item) {
+    const contentType = String(item.extension || 'unknown').toLowerCase();
+    const reason =
+      `${contentType.toUpperCase()} content is exported as retrieved, without de-identification. ` +
+      'Patient identity may remain in the frames, audio, or container metadata.';
+    notAnonymizedItems.push({
+      studyInstanceUid: item.studyUid,
+      seriesInstanceUid: item.seriesUid,
+      sopInstanceUid: item.sopUid,
+      fileName: fileName(item),
+      contentType,
+      reason,
+    });
+    anonymizationWarnings.push(`${fileName(item)}: NOT ANONYMIZED — ${reason}`);
+    appendLog(dialog, `Not anonymized: ${itemDisplayLabel(item)} — ${reason}`, 'warning');
+  }
+
   function handleTerminalIssue(error) {
     if (error && error.name === 'SessionExpiredError') {
       stopAllForIssue(sessionExpiredIssue());
@@ -375,7 +402,9 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
           return blob;
         }
         if (item.extension && item.extension !== 'dcm' && item.extension !== 'dicom') {
-          return blob; // Don't anonymize non-DICOM (like mp4)
+          // Non-DICOM payloads (mp4 and similar) cannot be de-identified here.
+          recordNotAnonymized(item);
+          return blob;
         }
         return blob.arrayBuffer().then(async buffer => {
           try {
@@ -468,6 +497,10 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
                 {
                   format: 'ohif-download-manager-export-manifest-v1',
                   status: failedCount === 0 ? 'complete' : 'partial_success',
+                  anonymizationRequested: Boolean(anonOptions),
+                  // DM-016: instances written without de-identification, even
+                  // though anonymization was requested for the export.
+                  notAnonymized: notAnonymizedItems,
                   requested: manifest.map(item => ({
                     studyInstanceUid: item.studyUid,
                     seriesInstanceUid: item.seriesUid,
@@ -526,6 +559,7 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
       status: failedCount > 0 ? (doneCount > 0 ? 'partial_success' : 'failed') : 'complete',
       failedItems,
       anonymizationWarnings,
+      notAnonymizedItems,
     }));
 }
 
