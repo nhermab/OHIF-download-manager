@@ -5,9 +5,9 @@
  * Streaming ZIP archive writer.
  */
 
-import { fileName } from "../manifest.js";
-import { safeName, createNamedError, sanitize } from "../utils.js";
-import { triggerBlobDownload } from "../downloader.js";
+import { fileName } from "../downloader/manifest.js";
+import { safeName, createNamedError, sanitize } from "../utils/index.js";
+import { triggerBlobDownload } from "../downloader/downloader.js";
 
 let crcTableCache = null;
 

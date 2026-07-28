@@ -12,7 +12,7 @@ import {
   parseTagWhitelist,
   isNonDefaultConfig,
   getNonDefaultDetails,
-} from '../anonymizer-config';
+} from '../anonymizer/anonymizerConfig';
 
 interface AnonymizerPanelProps {
   config: any;

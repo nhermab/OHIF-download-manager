@@ -5,7 +5,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@ohif/ui-next';
-import { formatBytes, formatTransferSpeed } from '../utils';
+import { formatBytes, formatTransferSpeed } from '../utils/index.js';
 import DicomDiagnosticLink from './DicomDiagnosticLink';
 
 interface DownloadProgressViewProps {

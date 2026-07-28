@@ -5,13 +5,13 @@
 
 import React, { useState, useMemo } from 'react';
 import { Button } from '@ohif/ui-next';
-import { formatBytes, formatDuration } from '../utils';
+import { formatBytes, formatDuration } from '../utils/index.js';
 import {
   buildRunReport,
   copyTextToClipboard,
   groupFailuresBySeries,
   itemIdentityLabel,
-} from '../report';
+} from '../anonymizer/report';
 import DicomDiagnosticLink from './DicomDiagnosticLink';
 
 interface DownloadSummaryViewProps {

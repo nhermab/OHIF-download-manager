@@ -77,7 +77,7 @@ After starting the dev server, open your browser and navigate to **`http://local
   - `ContributingEquipmentSequence (0018,A001)`: Complete equipment provenance log recording de-identification software identity and timestamp.
 
 ### 3. Optical & Topological Pixel Redaction Engine
-- **Micro-OCR Text Detection**: Embedded glyph segmentation engine ([`src/ocr-engine.js`](./src/ocr-engine.js)) recognizing patient demographic annotations across diverse medical fonts, orientations, and contrast levels.
+- **Micro-OCR Text Detection**: Embedded glyph segmentation engine ([`src/anonymizer/ocrEngine.js`](./src/anonymizer/ocrEngine.js)) recognizing patient demographic annotations across diverse medical fonts, orientations, and contrast levels.
 - **Stroke-Width Transform (SWT) & Edge Topology Filter**: Uses SWT variance analysis to distinguish character text strokes from high-contrast anatomical edges (e.g., diaphragmatic contours, surgical clips, cortical bone borders, ECG leads), preventing false-positive anatomical blackouts.
 - **RSNA PHI vs. Clinical Measurement Classifier**: Disambiguates sensitive Protected Health Information (PHI) from vital diagnostic graphics (e.g., millimeter calipers, ROI HU values, angle measurements).
 - **Sequential Multi-Frame Scan Verification**: Evaluates multi-frame cine loops sequentially (`multiFrameRedactionMethod: "aggressive"`) to ensure no un-scanned intermediate frames escape redaction. Fail-closed semantics ensure `BurnedInAnnotation (0028,0301)` is set to `"NO"` only when pixel redaction is independently verified clean.
@@ -114,30 +114,69 @@ After starting the dev server, open your browser and navigate to **`http://local
 
 ---
 
-## Project Architecture
+## Project Structure
 
 ```text
-extensions/download-manager/
+OHIF-download-manager/
 ├── src/
-│   ├── index.tsx                  # OHIF Extension entry point & command registration
-│   ├── anonymizer.js              # Core DICOM header PS 3.15 tag anonymization engine
-│   ├── anonymizer-config.js       # Persistent anonymizer settings, rules, & presets
-│   ├── anonymizer-rules.js        # Comprehensive DICOM Data Element dictionary rules
-│   ├── pixel-redactor.js          # Image pixel redaction engine & multi-frame processor
-│   ├── ocr-engine.js              # Micro-OCR engine & SWT edge topology analyzer
-│   ├── phi-classifier.js          # RSNA PHI vs measurement overlay text classifier
-│   ├── dicom-codecs.js            # WebAssembly codec decoder/encoder pipeline
-│   ├── downloader.js              # Pipeline queue manager, fetch streams, & manifest generator
-│   ├── manifest.js                # Selection tree compilation & path generator
+│   ├── index.tsx                    # OHIF extension lifecycle and module registration
+│   ├── getCommandsModule.ts         # Toolbar command definitions
+│   ├── getPanelModule.tsx           # Optional panel module definition
+│   ├── config.js                    # Runtime configuration access
+│   ├── components/                  # React modal, panel, progress, and diagnostics UI
+│   ├── downloader/
+│   │   ├── downloader.js            # Export orchestration, retries, and hashing
+│   │   ├── manifest.js              # Dataset selection and neutral output paths
+│   │   ├── network.js               # DICOMweb request helpers
+│   │   ├── ohifState.js             # OHIF service and display-set integration
+│   │   ├── state.js                 # Download Manager session state
+│   │   ├── dialog.js                # DOM dialog implementation
+│   │   └── ui.js                    # DOM UI helpers
+│   ├── anonymizer/
+│   │   ├── anonymizer.js            # DICOM PS 3.15 metadata anonymization
+│   │   ├── anonymizerConfig.js      # Persisted settings and presets
+│   │   ├── pixelRedactor.js         # Multi-frame pixel redaction pipeline
+│   │   ├── ocrEngine.js             # Browser OCR and SWT analysis
+│   │   ├── phiClassifier.js         # PHI and clinical-overlay classification
+│   │   ├── safePrivateRules.js      # Safe private-attribute policy
+│   │   └── report.js                # Export and failure reports
+│   ├── dicom/
+│   │   ├── dicomCodecs.js           # DICOM frame decoding and encoding
+│   │   ├── dicomDiagnostics.js      # Developer diagnostic dump support
+│   │   ├── dicomFixes.js            # Input repair and normalization helpers
+│   │   └── staticDicomReconstruction.js
 │   ├── writers/
-│   │   ├── zipWriter.js           # OPFS / IndexedDB tiered streaming ZIP archive writer
-│   │   └── folderWriter.js        # Native File System Access API writer
-│   └── components/                # React UI components (AnonymizerPanel, ModalityFilter, etc.)
-├── docs/                          # Comprehensive user & technical documentation suite
-├── [SHORTCOMINGS.md](./SHORTCOMINGS.md)                # Safety audit log & technical boundary reference
-├── package.json                   # Package manifest & dependencies
-└── README.md                      # Primary technical README
+│   │   ├── zipWriter.js             # OPFS/IndexedDB streaming ZIP output
+│   │   └── folderWriter.js          # File System Access API output
+│   ├── constants/                   # Application and DICOM constants
+│   ├── utils/                       # Formatting, path, and string helpers
+│   ├── anonymizer-rules.js          # Runtime DICOM tag rules
+│   ├── anonymizer-rules.json        # Serializable tag-rule data
+│   ├── default-anonymizer.script    # Default anonymization script
+│   └── plugin.css                   # Extension styling
+├── test/                            # Jest unit tests grouped outside runtime code
+├── docs/                            # User, privacy, storage, and troubleshooting guides
+├── .webpack/                        # Standalone development and production builds
+├── jest.config.js                   # Extension test discovery and module mapping
+├── package.json                     # Package metadata, scripts, and dependencies
+├── SHORTCOMINGS.md                  # Safety audit and technical limitations
+├── UI-SHORTCOMINGS.md               # UI/UX review and known gaps
+└── README.md
 ```
+
+When installed in the OHIF Viewer monorepo, this repository is normally cloned
+at `extensions/download-manager/`. Runtime code is grouped by responsibility:
+
+| Directory | Responsibility |
+| --- | --- |
+| `src/components` | OHIF UI components and developer diagnostics |
+| `src/downloader` | Selection, retrieval, retry, state, and export orchestration |
+| `src/anonymizer` | Metadata de-identification, OCR, PHI classification, pixel redaction, and reports |
+| `src/dicom` | DICOM reconstruction, repair, codecs, and diagnostics |
+| `src/writers` | Streaming ZIP and native folder output backends |
+| `src/constants` | Shared application and transfer-syntax constants |
+| `src/utils` | Reusable string, path, and formatting helpers |
+| `test` | Unit tests mirroring the runtime responsibilities |
 
 ---
 
@@ -238,6 +277,7 @@ For detailed guides, compliance specifications, and user manuals, consult the **
 3. **[03. Metadata Anonymization](./docs/03-metadata-anonymization.md)**: DICOM PS 3.15 tag rules engine, script presets, and provenance tags.
 4. **[04. Pixel Redaction & Technical Limitations](./docs/04-pixel-redaction-and-limitations.md)**: Micro-OCR engine, Stroke-Width Transform (SWT) topology filtering, WebAssembly codecs, and safety boundaries.
 5. **[05. Storage Writers & Troubleshooting](./docs/05-storage-directory-layout-troubleshooting.md)**: OPFS/IndexedDB streaming ZIP writers, SHA-256 manifests, neutral path formatting, and troubleshooting.
+6. **[06. UI Error & Retry Flows](./docs/06-ui-error-and-retry-flows.md)**: Error states, retry behavior, developer diagnostics, and recovery guidance.
 
 ---
 
@@ -273,8 +313,8 @@ Licensed under the **MIT License**. See [LICENSE](./LICENSE) for full details.
 > IN NO EVENT SHALL THE AUTHOR (**NICK HERMANS**), **UZ LEUVEN** (UNIVERSITY HOSPITALS LEUVEN), OR ANY CONTRIBUTORS / COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, DATA LOSS, PRIVACY BREACH, REGULATORY NON-COMPLIANCE, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### Third-Party Credits & Code Provenance
-- **RSNA DICOM Anonymizer V18.0 / MIRC CTP Anonymizer** (Apache License 2.0) — Applies to tag transformation rules, script definitions, and PHI classification schemas (`src/default-anonymizer.script`, `src/anonymizer-rules.js`, `src/anonymizer-rules.json`, `src/rules.json`, `src/anonymizer-config.js`, `src/anonymizer.js`, `src/phi-classifier.js`).
-- **DicomCleaner™ / PixelMed Toolkit** (BSD 3-Clause License) — Applies to safe private attribute lists and retains/removes rules (`src/safe-private-rules.js`, `src/anonymizer.js`).
-- **OHIF Download Manager Extension / Original Contributions** (MIT License) — Applies to all UI components, modal dialogs, streaming ZIP/folder writers, optical pixel redaction engine, WebAssembly transcoders, and test suites by Nick Hermans / UZ Leuven (`src/pixel-redactor.js`, `src/ocr-engine.js`, `src/downloader.js`, `src/manifest.js`, `src/components/*`, `src/writers/*`, etc.). See [LICENSE](./LICENSE) for full details.
+- **RSNA DICOM Anonymizer V18.0 / MIRC CTP Anonymizer** (Apache License 2.0) — Applies to tag transformation rules, script definitions, and PHI classification schemas (`src/default-anonymizer.script`, `src/anonymizer-rules.js`, `src/anonymizer-rules.json`, `src/rules.json`, `src/anonymizer/anonymizerConfig.js`, `src/anonymizer/anonymizer.js`, `src/anonymizer/phiClassifier.js`).
+- **DicomCleaner™ / PixelMed Toolkit** (BSD 3-Clause License) — Applies to safe private attribute lists and retains/removes rules (`src/anonymizer/safePrivateRules.js`, `src/anonymizer/anonymizer.js`).
+- **OHIF Download Manager Extension / Original Contributions** (MIT License) — Applies to all UI components, modal dialogs, streaming ZIP/folder writers, optical pixel redaction engine, WebAssembly transcoders, and test suites by Nick Hermans / UZ Leuven (`src/anonymizer/pixelRedactor.js`, `src/anonymizer/ocrEngine.js`, `src/downloader/downloader.js`, `src/downloader/manifest.js`, `src/components/*`, `src/writers/*`, `test/*`, etc.). See [LICENSE](./LICENSE) for full details.
 
 

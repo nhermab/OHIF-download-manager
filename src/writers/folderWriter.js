@@ -5,8 +5,8 @@
  * File System Access API folder writer.
  */
 
-import { fileName } from "../manifest.js";
-import { sanitize } from "../utils.js";
+import { fileName } from "../downloader/manifest.js";
+import { sanitize } from "../utils/index.js";
 
 export class FolderWriter {
   constructor(root) {

@@ -15,7 +15,7 @@ import {
   seriesThumbnailSrc,
   buildManifest,
   studyLabel,
-} from '../manifest';
+} from '../downloader/manifest';
 
 interface SeriesListProps {
   studies: any[];

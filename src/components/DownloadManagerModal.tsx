@@ -5,7 +5,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ScrollArea } from '@ohif/ui-next';
-import { currentPayload, state as globalState } from '../state';
+import { currentPayload, state as globalState } from '../downloader/state';
 import {
   flattenSeries,
   buildManifest,
@@ -13,15 +13,15 @@ import {
   availableModalities,
   modalityCodeForEntry,
   studyLabel,
-} from '../manifest';
+} from '../downloader/manifest';
 import {
   loadAnonymizerConfig,
   saveAnonymizerConfig,
   loadAnonymizerEnabled,
   saveAnonymizerEnabled,
-} from '../anonymizer-config';
-import { startDownload, canUseFolderWriter, defaultOutputMethod } from '../downloader';
-import { getDownloadAvailabilityMessage } from '../ohif-state';
+} from '../anonymizer/anonymizerConfig';
+import { startDownload, canUseFolderWriter, defaultOutputMethod } from '../downloader/downloader';
+import { getDownloadAvailabilityMessage } from '../downloader/ohifState';
 import { config } from '../config';
 
 import SeriesList from './SeriesList';

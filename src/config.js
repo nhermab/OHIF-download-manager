@@ -5,7 +5,7 @@
  * Download Manager configuration constants.
  */
 
-import { PLUGIN_ID } from './constants.js';
+import { PLUGIN_ID } from './constants/app.js';
 
 export const MAX_MULTIFRAME_SELECTION_OPTIONS = 100;
 export const PREF_DB_NAME = `${PLUGIN_ID}Prefs`;

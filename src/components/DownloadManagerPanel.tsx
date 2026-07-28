@@ -5,8 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@ohif/ui-next';
-import { currentPayload, state as globalState } from '../state';
-import { flattenSeries, buildManifest, studyLabel } from '../manifest';
+import { currentPayload, state as globalState } from '../downloader/state';
+import { flattenSeries, buildManifest, studyLabel } from '../downloader/manifest';
 import DownloadManagerModal from './DownloadManagerModal';
 
 export default function DownloadManagerPanel({

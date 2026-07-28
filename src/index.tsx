@@ -8,8 +8,8 @@
 import { id } from './id';
 import getCommandsModule from './getCommandsModule';
 import getPanelModule from './getPanelModule';
-import { loadLastDirectoryHandle, state } from './state';
-import { setOhifServices } from './ohif-state';
+import { loadLastDirectoryHandle, state } from './downloader/state';
+import { setOhifServices } from './downloader/ohifState';
 import { isEnabled } from './config';
 import './plugin.css';
 

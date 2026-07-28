@@ -11,8 +11,8 @@ import {
   diagnosticFileName,
   downloadDiagnosticBlob,
   fetchRawDicomForDiagnostics,
-} from '../dicomDiagnostics';
-import { copyTextToClipboard } from '../report';
+} from '../dicom/dicomDiagnostics';
+import { copyTextToClipboard } from '../anonymizer/report';
 
 interface DicomDiagnosticDialogProps {
   diagnostic: any;
