@@ -4,6 +4,25 @@
 > **Scope**: everything the user *sees* and *can act on* when something goes wrong.
 > **Companion document**: [`UI-shortcomings.md`](../UI-shortcomings.md) — how these flows should be improved.
 
+## Developer-only raw DICOM diagnostics
+
+The runtime option `window.config.aquestDownloadManager.devMode` defaults to
+`false`. When explicitly set to `true`, final per-instance DICOM errors include
+a clickable `SOPInstanceUID` in both the live activity log and retained summary
+log. The resulting large diagnostic dialog shows a `dcmdump`-style listing of
+all parsed elements except `(7FE0,0008)`, `(7FE0,0009)`, and `(7FE0,0010)`.
+Transfer Syntax is repeated prominently above the dump.
+
+The dialog can copy or download the text dump and download the raw response as
+`.raw.dcm`. The raw response is captured before anonymization, pixel redaction,
+hashing, and output-writer processing. If no body was received, the dialog
+attempts one authenticated raw refetch. It never reconstructs a synthetic file
+for frame-only sources.
+
+This mode exposes identifiable data and may retain failed raw instances in
+browser memory until the run log is reset or the modal unmounts. It must only
+be enabled in trusted development environments.
+
 This document diagrams the **as-built** behaviour of the extension's user interface: which
 surfaces render messages, which state each surface can enter, how a failure is classified,
 what the user is told, and what recovery actions are actually reachable from that point.

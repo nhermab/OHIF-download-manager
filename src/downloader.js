@@ -9,7 +9,13 @@ import { state, currentPayload, saveLastDirectoryHandle } from './state.js';
 import { config } from './config.js';
 import { FolderWriter } from './writers/folderWriter.js';
 import { ChunkedZipWriter } from './writers/zipWriter.js';
-import { buildManifest, fileName, truncateStudyDir, truncateSeriesDir, validateManifestSelection } from './manifest.js';
+import {
+  buildManifest,
+  fileName,
+  truncateStudyDir,
+  truncateSeriesDir,
+  validateManifestSelection,
+} from './manifest.js';
 import {
   errorMessage,
   formatBytes,
@@ -25,11 +31,14 @@ import { closeDialog, renderComplete, renderError } from './dialog.js';
 import { anonymizeDicom, getMappedUid, resetAnonymizationSession } from './anonymizer.js';
 import { authorizationHeaders } from './ohif-state.js';
 import { reconstructStaticDicom } from './static-dicom-reconstruction.js';
+import { createDicomDiagnostic, isDicomDiagnosticsEnabled } from './dicomDiagnostics.js';
 import dicomParser from 'dicom-parser';
 
 export function startDownload(target, selected, anonOptions, outputMethod = defaultOutputMethod()) {
   if (state.activeAbortController) {
-    return Promise.reject(createNamedError('ExportInProgressError', 'An export is already in progress.'));
+    return Promise.reject(
+      createNamedError('ExportInProgressError', 'An export is already in progress.')
+    );
   }
   const manifestErrors = validateManifestSelection(selected);
   if (manifestErrors.length) {
@@ -94,7 +103,10 @@ export function startDownload(target, selected, anonOptions, outputMethod = defa
     if (!anonOptions.onPromptMultiFrameMethod) {
       let promptPromise = null;
       anonOptions.onPromptMultiFrameMethod = async ({ numberOfFrames }) => {
-        if (anonOptions.multiFrameRedactionMethod && anonOptions.multiFrameRedactionMethod !== 'ask') {
+        if (
+          anonOptions.multiFrameRedactionMethod &&
+          anonOptions.multiFrameRedactionMethod !== 'ask'
+        ) {
           return anonOptions.multiFrameRedactionMethod;
         }
         if (promptPromise) return promptPromise;
@@ -108,8 +120,8 @@ export function startDownload(target, selected, anonOptions, outputMethod = defa
           } else if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
             const useAggressive = window.confirm(
               `Multi-frame DICOM image (${numberOfFrames} frames) with burned-in annotations detected.\n\n` +
-              `Do you want to use the AGGRESSIVE method (scans all frames sequentially - recommended to prevent PHI leaks) instead of SAMPLING?\n\n` +
-              `Click OK for Aggressive Method, or Cancel for Sampling Method.`
+                `Do you want to use the AGGRESSIVE method (scans all frames sequentially - recommended to prevent PHI leaks) instead of SAMPLING?\n\n` +
+                `Click OK for Aggressive Method, or Cancel for Sampling Method.`
             );
             const choice = useAggressive ? 'aggressive' : 'sampling';
             anonOptions.multiFrameRedactionMethod = choice;
@@ -172,7 +184,9 @@ export function startDownload(target, selected, anonOptions, outputMethod = defa
   }
 
   chooseWriter(target, anonOptions, outputMethod)
-    .then(writer => downloadManifest(manifest, writer, target, state.activeAbortController.signal, anonOptions))
+    .then(writer =>
+      downloadManifest(manifest, writer, target, state.activeAbortController.signal, anonOptions)
+    )
     .then(summary => {
       if (typeof target?.onComplete === 'function') {
         target.onComplete(summary);
@@ -216,12 +230,11 @@ export function chooseWriter(dialog, anonOptions, outputMethod = defaultOutputMe
         )
       );
     }
-    return pickDirectoryHandle()
-      .then(directory => {
-        state.lastDirHandle = directory;
-        saveLastDirectoryHandle(directory);
-        return new FolderWriter(directory);
-      });
+    return pickDirectoryHandle().then(directory => {
+      state.lastDirHandle = directory;
+      saveLastDirectoryHandle(directory);
+      return new FolderWriter(directory);
+    });
   }
   appendMultipleDownloadNotice(dialog);
   return Promise.resolve(
@@ -319,18 +332,21 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
     });
   }
 
-  function finalizeFailure(item, error) {
+  function finalizeFailure(item, error, diagnosticItem, rawDicomBlob) {
     failedCount++;
     const errText = errorMessage(error);
-    failedItems.push({ item, error: errText });
+    const sourceItem = diagnosticItem || item;
+    const dicomDiagnostic = createDicomDiagnostic(sourceItem, rawDicomBlob || error?.rawDicomBlob);
+    failedItems.push({ item, error: errText, dicomDiagnostic });
     if (stats) {
       stats.failed++;
-      stats.currentItem = `Could not download ${fileName(item)}`;
+      stats.currentItem = `Could not download ${fileName(sourceItem)}`;
     }
     appendLog(
       dialog,
-      `Could not download ${itemDisplayLabel(item)}: ${errText}`,
-      'error'
+      `Could not download ${itemDisplayLabel(sourceItem)}: ${errText}`,
+      'error',
+      dicomDiagnostic ? { dicomDiagnostic } : undefined
     );
     updateProgress(dialog, stats);
   }
@@ -391,6 +407,9 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
       return Promise.resolve();
     }
     const item = queue.shift();
+    // Snapshot the source identity before anonymization remaps item UIDs.
+    const diagnosticItem = createDicomDiagnostic(item, null)?.item || null;
+    let rawDicomBlob = null;
     if (stats) {
       stats.currentItem = `Downloading ${fileName(item)}`;
     }
@@ -398,6 +417,9 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
 
     return fetchItem(item, signal)
       .then(blob => {
+        if (diagnosticItem) {
+          rawDicomBlob = blob;
+        }
         if (!anonOptions) {
           return blob;
         }
@@ -413,7 +435,8 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
             const optsToUse = {
               ...baseOptions,
               warnings: itemWarnings,
-              onPixelDataFallback: message => appendLog(dialog, `${itemDisplayLabel(item)}: ${message}`, 'warning'),
+              onPixelDataFallback: message =>
+                appendLog(dialog, `${itemDisplayLabel(item)}: ${message}`, 'warning'),
             };
             const outBuffer = await anonymizeDicom(buffer, optsToUse);
             if (itemWarnings.length > 0) {
@@ -462,12 +485,24 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
             error.name === 'SecurityError' ||
             isQuotaError(error))
         ) {
+          const dicomDiagnostic = createDicomDiagnostic(
+            diagnosticItem || item,
+            rawDicomBlob || error?.rawDicomBlob
+          );
+          if (dicomDiagnostic) {
+            appendLog(
+              dialog,
+              `Download stopped at ${itemDisplayLabel(item)}: ${errorMessage(error)}`,
+              'error',
+              { dicomDiagnostic }
+            );
+          }
           handleTerminalIssue(error);
         }
         if (item._attempts < retryCount && isRetryableError(error)) {
           return scheduleRetry(item, error);
         }
-        finalizeFailure(item, error);
+        finalizeFailure(item, error, diagnosticItem, rawDicomBlob);
       })
       .then(worker);
   }
@@ -486,7 +521,10 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
       }
 
       if (typeof writer.writeArtifact !== 'function') {
-        throw createNamedError('IntegrityManifestError', 'The selected export writer cannot record the required integrity manifest.');
+        throw createNamedError(
+          'IntegrityManifestError',
+          'The selected export writer cannot record the required integrity manifest.'
+        );
       }
       return writer
         .writeArtifact(
@@ -526,7 +564,10 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
           writer.writeArtifact(
             'checksums.sha256',
             new Blob(
-              [integrityRecords.map(record => `${record.sha256}  ${record.file}`).join('\n') + '\n'],
+              [
+                integrityRecords.map(record => `${record.sha256}  ${record.file}`).join('\n') +
+                  '\n',
+              ],
               { type: 'text/plain' }
             )
           )
@@ -535,7 +576,11 @@ export function downloadManifest(manifest, writer, dialog, signal, anonOptions) 
           if (!signal.aborted && writer && typeof writer.finalize === 'function') {
             if (stats && writer.name === 'chunked-zip') {
               stats.currentItem = 'Preparing the final verified download file...';
-              appendLog(dialog, 'Preparing the final verified download file, please wait...', 'info');
+              appendLog(
+                dialog,
+                'Preparing the final verified download file, please wait...',
+                'info'
+              );
               updateProgress(dialog, stats);
             }
             return writer.finalize();
@@ -584,7 +629,10 @@ export async function sha256Blob(blob) {
       return nodeCrypto.createHash('sha256').update(Buffer.from(buffer)).digest('hex');
     }
   } catch (ignore) {}
-  throw createNamedError('IntegrityManifestError', 'This browser cannot calculate the required SHA-256 export manifest.');
+  throw createNamedError(
+    'IntegrityManifestError',
+    'This browser cannot calculate the required SHA-256 export manifest.'
+  );
 }
 
 export function fetchItem(item, signal) {
@@ -619,7 +667,10 @@ export function fetchItem(item, signal) {
       const contentType = response.headers.get('content-type') || '';
       if (item.extension === 'mp4') {
         if (!/^video\/mp4(?:;|$)/i.test(contentType)) {
-          throw createNamedError('PayloadValidationError', 'Server did not return MP4 video content.');
+          throw createNamedError(
+            'PayloadValidationError',
+            'Server did not return MP4 video content.'
+          );
         }
       } else if (!/^application\/dicom(?:;|$)/i.test(contentType)) {
         throw createNamedError('PayloadValidationError', 'Server did not return DICOM content.');
@@ -653,14 +704,27 @@ export async function validateRetrievedPayload(item, blob) {
       actual.seriesUid !== item.seriesUid ||
       actual.studyUid !== item.studyUid
     ) {
-      throw createNamedError('PayloadValidationError', 'Retrieved DICOM instance does not match the requested study, series, and instance UIDs.');
+      throw createNamedError(
+        'PayloadValidationError',
+        'Retrieved DICOM instance does not match the requested study, series, and instance UIDs.'
+      );
     }
     return blob;
   } catch (error) {
+    if (isDicomDiagnosticsEnabled() && blob) {
+      error.rawDicomBlob = blob;
+    }
     if (error?.name === 'PayloadValidationError') {
       throw error;
     }
-    throw createNamedError('PayloadValidationError', 'Server response is not a parseable DICOM Part 10 instance.');
+    const payloadError = createNamedError(
+      'PayloadValidationError',
+      'Server response is not a parseable DICOM Part 10 instance.'
+    );
+    if (isDicomDiagnosticsEnabled()) {
+      payloadError.rawDicomBlob = blob;
+    }
+    throw payloadError;
   }
 }
 
@@ -702,10 +766,10 @@ export function updateProgress(target, stats) {
   }
 }
 
-export function appendLog(target, message, type) {
+export function appendLog(target, message, type, details) {
   const timestamp = new Date().toLocaleTimeString();
   if (typeof target?.onLog === 'function') {
-    target.onLog({ timestamp, message, type: type || 'info' });
+    target.onLog({ timestamp, message, type: type || 'info', ...(details || {}) });
   }
   if (target && typeof target.querySelector === 'function') {
     const log = target.querySelector('[data-log]');

@@ -191,6 +191,9 @@ window.config = {
   // Standard OHIF configuration...
   aquestDownloadManager: {
     enabled: true,
+    // Developer diagnostics are OFF by default. When enabled, failed DICOM
+    // entries expose their raw, identifiable response and a tag dump.
+    devMode: false,
     maxParallel: 3,
     preferFolderWriter: false,
     retryCount: 1,
@@ -204,6 +207,25 @@ window.config = {
   },
 };
 ```
+
+#### Developer diagnostics for failed DICOM instances
+
+Set `aquestDownloadManager.devMode: true` only in a trusted development
+environment. Failed DICOM log entries then show a clickable
+`SOPInstanceUID`. The diagnostic dialog:
+
+- highlights the Transfer Syntax UID and its common name;
+- renders a selectable, copyable, downloadable `dcmdump`-style tag listing;
+- omits Float Pixel Data, Double Float Pixel Data, and Pixel Data from the text;
+- lets the developer download the original raw response as `.raw.dcm`, before
+  anonymization, pixel redaction, transcoding, hashing, or writer processing.
+
+Raw failed responses can contain protected health information and are retained
+in browser memory for the current Download Manager run. When the failure
+happened before a response body arrived, opening the diagnostic performs one
+fresh authenticated raw request. Sources that provide metadata and frames
+separately cannot offer an original `.dcm` without reconstruction, so the
+dialog reports that limitation instead of creating a synthetic file.
 
 ---
 

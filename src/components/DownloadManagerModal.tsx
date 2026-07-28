@@ -28,6 +28,7 @@ import SeriesList from './SeriesList';
 import DownloadProgressView from './DownloadProgressView';
 import DownloadSummaryView from './DownloadSummaryView';
 import AnonymizerPanel from './AnonymizerPanel';
+import DicomDiagnosticDialog from './DicomDiagnosticDialog';
 
 interface DownloadManagerModalProps {
   hideModal?: () => void;
@@ -78,7 +79,12 @@ export default function DownloadManagerModal({
   // Download Progress state
   const [downloadStats, setDownloadStats] = useState<any>(null);
   const [downloadLogs, setDownloadLogs] = useState<
-    Array<{ timestamp: string; message: string; type: string }>
+    Array<{
+      timestamp: string;
+      message: string;
+      type: string;
+      dicomDiagnostic?: any;
+    }>
   >([]);
   const [droppedLogCount, setDroppedLogCount] = useState(0);
   const [downloadSummary, setDownloadSummary] = useState<any>(null);
@@ -86,14 +92,29 @@ export default function DownloadManagerModal({
   const [downloadIssue, setDownloadIssue] = useState<any>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+  const [activeDicomDiagnostic, setActiveDicomDiagnostic] = useState<any>(null);
 
   // Progress arrives faster than React state settles; the outcome handlers need
   // the latest counts synchronously.
   const statsRef = useRef<any>(null);
   const lastRunItemsRef = useRef<any[]>([]);
 
-  const logsRef = useRef<Array<{ timestamp: string; message: string; type: string }>>([]);
-  const pendingLogsRef = useRef<Array<{ timestamp: string; message: string; type: string }>>([]);
+  const logsRef = useRef<
+    Array<{
+      timestamp: string;
+      message: string;
+      type: string;
+      dicomDiagnostic?: any;
+    }>
+  >([]);
+  const pendingLogsRef = useRef<
+    Array<{
+      timestamp: string;
+      message: string;
+      type: string;
+      dicomDiagnostic?: any;
+    }>
+  >([]);
   const droppedLogsRef = useRef(0);
   const flushTimerRef = useRef<number | null>(null);
 
@@ -258,10 +279,7 @@ export default function DownloadManagerModal({
     return allSeries.filter(s => selectedSeriesIds.has(s.id));
   }, [allSeries, selectedSeriesIds]);
 
-  const selectedManifest = useMemo(
-    () => buildManifest(selectedSeriesList),
-    [selectedSeriesList]
-  );
+  const selectedManifest = useMemo(() => buildManifest(selectedSeriesList), [selectedSeriesList]);
 
   const selectedFilesCount = selectedManifest.length;
 
@@ -282,8 +300,7 @@ export default function DownloadManagerModal({
   // over the entry limit fails after every file has been fetched. The limit is
   // exact and known here: say so before the run instead of an hour into it.
   const zipMaxEntries = useMemo(() => Number(config().zipMaxEntries) || 60000, []);
-  const exceedsZipEntryLimit =
-    outputMethod === 'zip' && selectedFilesCount + 2 > zipMaxEntries;
+  const exceedsZipEntryLimit = outputMethod === 'zip' && selectedFilesCount + 2 > zipMaxEntries;
 
   const modalitySelections = useMemo(
     () =>
@@ -360,7 +377,12 @@ export default function DownloadManagerModal({
         statsRef.current = stats;
         setDownloadStats(stats);
       },
-      onLog: (logEntry: { timestamp: string; message: string; type: string }) => {
+      onLog: (logEntry: {
+        timestamp: string;
+        message: string;
+        type: string;
+        dicomDiagnostic?: any;
+      }) => {
         pendingLogsRef.current.push(logEntry);
         scheduleLogFlush();
       },
@@ -600,7 +622,8 @@ export default function DownloadManagerModal({
                 </label>
                 {!folderWriterAvailable && (
                   <p className="text-muted-foreground">
-                    Your browser does not support saving directly to a folder, so ZIP download is used.
+                    Your browser does not support saving directly to a folder, so ZIP download is
+                    used.
                   </p>
                 )}
               </fieldset>
@@ -745,7 +768,7 @@ export default function DownloadManagerModal({
 
               {/* Warn before the export, not in the summary afterwards. */}
               {anonEnabled && nonDicomSelectedCount > 0 && (
-                <div className="border-amber-500/40 bg-amber-500/10 text-foreground flex items-start gap-2 rounded border p-3 text-sm">
+                <div className="text-foreground flex items-start gap-2 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
                   <span aria-hidden="true">🛡️</span>
                   <span>
                     <strong>
@@ -823,7 +846,7 @@ export default function DownloadManagerModal({
                   ref={multiFramePromptRef}
                   role="alert"
                   aria-live="assertive"
-                  className="border-amber-500/40 bg-amber-500/10 text-foreground space-y-2 rounded border p-3 text-xs"
+                  className="text-foreground space-y-2 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs"
                 >
                   <div className="flex items-center gap-2 font-semibold text-amber-500">
                     <span aria-hidden="true">⚠️</span>
@@ -865,7 +888,7 @@ export default function DownloadManagerModal({
                 <div
                   role="alertdialog"
                   aria-label="Stop the download?"
-                  className="border-amber-500/40 bg-amber-500/10 text-foreground space-y-2 rounded border p-3 text-sm"
+                  className="text-foreground space-y-2 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
                 >
                   <p>
                     <strong>Stop this download?</strong>{' '}
@@ -899,6 +922,7 @@ export default function DownloadManagerModal({
                 droppedLogCount={droppedLogCount}
                 awaitingInput={Boolean(multiFramePrompt)}
                 onCancel={handleRequestCancel}
+                onInspectDicom={setActiveDicomDiagnostic}
               />
             </div>
           )}
@@ -912,7 +936,9 @@ export default function DownloadManagerModal({
               droppedLogCount={droppedLogCount}
               startedAt={runStartedAt || undefined}
               onClose={handleClose}
-              onRetryFailed={downloadSummary?.failedItems?.length > 0 ? handleRetryFailed : undefined}
+              onRetryFailed={
+                downloadSummary?.failedItems?.length > 0 ? handleRetryFailed : undefined
+              }
               onRetryAll={
                 step === 'error' &&
                 !downloadSummary?.failedItems?.length &&
@@ -921,6 +947,7 @@ export default function DownloadManagerModal({
                   : undefined
               }
               onBackToSelection={showBackToSelection ? handleBackToSelection : undefined}
+              onInspectDicom={setActiveDicomDiagnostic}
             />
           )}
         </div>
@@ -962,6 +989,13 @@ export default function DownloadManagerModal({
             Start Download ({selectedFilesCount} Files)
           </Button>
         </div>
+      )}
+
+      {activeDicomDiagnostic && (
+        <DicomDiagnosticDialog
+          diagnostic={activeDicomDiagnostic}
+          onClose={() => setActiveDicomDiagnostic(null)}
+        />
       )}
     </div>
   );

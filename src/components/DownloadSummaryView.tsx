@@ -12,12 +12,18 @@ import {
   groupFailuresBySeries,
   itemIdentityLabel,
 } from '../report';
+import DicomDiagnosticLink from './DicomDiagnosticLink';
 
 interface DownloadSummaryViewProps {
   summary?: any;
   error?: any;
   issue?: any;
-  logs?: Array<{ timestamp: string; message: string; type: string }>;
+  logs?: Array<{
+    timestamp: string;
+    message: string;
+    type: string;
+    dicomDiagnostic?: any;
+  }>;
   droppedLogCount?: number;
   runId?: string;
   startedAt?: number;
@@ -25,6 +31,7 @@ interface DownloadSummaryViewProps {
   onRetryFailed?: () => void;
   onRetryAll?: () => void;
   onBackToSelection?: () => void;
+  onInspectDicom?: (diagnostic: any) => void;
 }
 
 export function groupAnonymizationWarnings(anonWarnings: string[]) {
@@ -33,7 +40,8 @@ export function groupAnonymizationWarnings(anonWarnings: string[]) {
   anonWarnings.forEach(entry => {
     const colonIdx = entry.indexOf(': ');
     const msg =
-      colonIdx !== -1 && (entry.slice(0, colonIdx).includes('.dcm') || entry.slice(0, colonIdx).includes('SOP'))
+      colonIdx !== -1 &&
+      (entry.slice(0, colonIdx).includes('.dcm') || entry.slice(0, colonIdx).includes('SOP'))
         ? entry.slice(colonIdx + 2)
         : entry;
     categoryCounts[msg] = (categoryCounts[msg] || 0) + 1;
@@ -57,11 +65,14 @@ export default function DownloadSummaryView({
   onRetryFailed,
   onRetryAll,
   onBackToSelection,
+  onInspectDicom,
 }: DownloadSummaryViewProps) {
   const [showFailedDetails, setShowFailedDetails] = useState(false);
   const [showAnonDetails, setShowAnonDetails] = useState(false);
   const [showErrorStackTrace, setShowErrorStackTrace] = useState(false);
-  const [showLogs, setShowLogs] = useState(false);
+  const [showLogs, setShowLogs] = useState(() =>
+    logs.some(logEntry => Boolean(logEntry.dicomDiagnostic))
+  );
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   const doneCount = summary?.done || 0;
@@ -81,7 +92,11 @@ export default function DownloadSummaryView({
   const isFailure = !isCancelled && Boolean(error || issue || (!hasDoneFiles && totalCount > 0));
   const isPartialSuccess = !isCancelled && !isFailure && hasDoneFiles && hasFailedFiles;
   const isIncompleteAnonymization =
-    !isCancelled && !isFailure && !isPartialSuccess && hasDoneFiles && notAnonymizedItems.length > 0;
+    !isCancelled &&
+    !isFailure &&
+    !isPartialSuccess &&
+    hasDoneFiles &&
+    notAnonymizedItems.length > 0;
   const isCompleteSuccess =
     !isCancelled && !isFailure && !isPartialSuccess && !isIncompleteAnonymization && hasDoneFiles;
 
@@ -170,11 +185,13 @@ export default function DownloadSummaryView({
         <div className="grid grid-cols-4 gap-2 text-center text-xs">
           <div className="border-input bg-background rounded border p-2.5">
             <span className="text-muted-foreground block text-[11px]">Saved</span>
-            <span className="text-emerald-500 text-sm font-bold">{doneCount}</span>
+            <span className="text-sm font-bold text-emerald-500">{doneCount}</span>
           </div>
           <div className="border-input bg-background rounded border p-2.5">
             <span className="text-muted-foreground block text-[11px]">Failed</span>
-            <span className={`text-sm font-bold ${failedCount > 0 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+            <span
+              className={`text-sm font-bold ${failedCount > 0 ? 'text-amber-500' : 'text-muted-foreground'}`}
+            >
               {failedCount}
             </span>
           </div>
@@ -195,12 +212,10 @@ export default function DownloadSummaryView({
 
       {/* Un-anonymized instances — stated in full, never behind a collapsed card */}
       {notAnonymizedItems.length > 0 && (
-        <div className="border-amber-500/40 bg-amber-500/10 text-foreground space-y-1.5 rounded border p-3 text-xs">
+        <div className="text-foreground space-y-1.5 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
           <div className="flex items-center gap-1.5 font-semibold text-amber-500">
             <span aria-hidden="true">🛡️</span>
-            <span>
-              {notAnonymizedItems.length} file(s) exported without de-identification
-            </span>
+            <span>{notAnonymizedItems.length} file(s) exported without de-identification</span>
           </div>
           <p className="text-muted-foreground">
             Anonymization was requested for this export, but these files have no de-identification
@@ -250,7 +265,7 @@ export default function DownloadSummaryView({
 
       {/* Failed Items Breakdown, grouped by image set (Collapsed by default) */}
       {failedItems.length > 0 && (
-        <div className="border-amber-500/30 bg-amber-500/5 space-y-2 rounded border p-3 text-xs">
+        <div className="space-y-2 rounded border border-amber-500/30 bg-amber-500/5 p-3 text-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 font-semibold text-amber-500">
               <span aria-hidden="true">⚠️</span>
@@ -267,7 +282,8 @@ export default function DownloadSummaryView({
           </div>
 
           <p className="text-muted-foreground">
-            The saved files are complete and usable. You can re-download only the missing items below.
+            The saved files are complete and usable. You can re-download only the missing items
+            below.
           </p>
 
           {/* Where the failures cluster — always visible, one line per image set */}
@@ -288,9 +304,7 @@ export default function DownloadSummaryView({
                   {group.label}
                   {group.causes.length > 0 && (
                     <span className="block">
-                      {group.causes
-                        .map(cause => `${cause.count}× ${cause.cause}`)
-                        .join(' · ')}
+                      {group.causes.map(cause => `${cause.count}× ${cause.cause}`).join(' · ')}
                     </span>
                   )}
                 </span>
@@ -301,8 +315,23 @@ export default function DownloadSummaryView({
           {showFailedDetails && (
             <div className="border-input bg-background max-h-40 select-text space-y-1.5 overflow-y-auto rounded border p-2 font-mono text-[11px]">
               {failedItems.map((f: any, idx: number) => (
-                <div key={idx} className="border-b border-input/40 pb-1 last:border-b-0 last:pb-0">
-                  <div className="font-semibold text-foreground">{itemIdentityLabel(f.item)}</div>
+                <div
+                  key={idx}
+                  className="border-input/40 border-b pb-1 last:border-b-0 last:pb-0"
+                >
+                  <div className="text-foreground font-semibold">{itemIdentityLabel(f.item)}</div>
+                  {f.dicomDiagnostic?.item?.sopUid && onInspectDicom && (
+                    <div>
+                      SOPInstanceUID:{' '}
+                      <button
+                        type="button"
+                        className="text-primary break-all underline decoration-dotted underline-offset-2 hover:decoration-solid"
+                        onClick={() => onInspectDicom(f.dicomDiagnostic)}
+                      >
+                        {f.dicomDiagnostic.item.sopUid}
+                      </button>
+                    </div>
+                  )}
                   <div className="text-destructive">{f.error || 'Unknown download error'}</div>
                 </div>
               ))}
@@ -315,10 +344,21 @@ export default function DownloadSummaryView({
                 onClick={onRetryFailed}
                 variant="default"
                 size="sm"
-                className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                className="gap-1.5 bg-amber-600 text-white hover:bg-amber-700"
               >
-                <svg className="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <svg
+                  className="h-3.5 w-3.5"
+                  aria-hidden="true"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
                 </svg>
                 Retry Failed Files ({failedItems.length})
               </Button>
@@ -331,7 +371,7 @@ export default function DownloadSummaryView({
       {anonWarnings.length > 0 && (
         <div className="border-primary/30 bg-primary/5 space-y-2 rounded border p-3 text-xs">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 font-semibold text-primary">
+            <div className="text-primary flex items-center gap-1.5 font-semibold">
               <span aria-hidden="true">🛡️</span>
               <span>
                 Anonymization Audit & Governance ({anonWarnings.length} note
@@ -345,16 +385,26 @@ export default function DownloadSummaryView({
                 aria-expanded={showAnonDetails}
                 className="text-primary hover:underline"
               >
-                {showAnonDetails ? 'Hide itemized log' : `View itemized log (${anonWarnings.length})`}
+                {showAnonDetails
+                  ? 'Hide itemized log'
+                  : `View itemized log (${anonWarnings.length})`}
               </button>
             )}
           </div>
 
           {/* Grouped Category Summary (Always Visible & Compact) */}
-          <div className="space-y-1 text-muted-foreground">
+          <div className="text-muted-foreground space-y-1">
             {groupedAnonWarnings.map((cat, i) => (
-              <div key={i} className="flex items-start gap-1.5">
-                <span className="text-primary shrink-0" aria-hidden="true">•</span>
+              <div
+                key={i}
+                className="flex items-start gap-1.5"
+              >
+                <span
+                  className="text-primary shrink-0"
+                  aria-hidden="true"
+                >
+                  •
+                </span>
                 <span>
                   {cat.count > 1 && (
                     <strong className="text-foreground mr-1">({cat.count} files)</strong>
@@ -369,7 +419,10 @@ export default function DownloadSummaryView({
           {showAnonDetails && (
             <div className="border-input bg-background text-muted-foreground max-h-40 select-text space-y-1 overflow-y-auto rounded border p-2 font-mono text-[11px]">
               {anonWarnings.map((warning: string, i: number) => (
-                <div key={i} className="border-b border-input/30 pb-0.5 last:border-b-0">
+                <div
+                  key={i}
+                  className="border-input/30 border-b pb-0.5 last:border-b-0"
+                >
                   {warning}
                 </div>
               ))}
@@ -419,10 +472,16 @@ export default function DownloadSummaryView({
                         ? 'OK'
                         : 'INFO';
                 return (
-                  <div key={index} className={`flex items-start gap-1.5 ${typeClass}`}>
+                  <div
+                    key={index}
+                    className={`flex items-start gap-1.5 ${typeClass}`}
+                  >
                     <span className="text-muted-foreground shrink-0">[{log.timestamp}]</span>
                     <span className="shrink-0 font-semibold">{severityPrefix}</span>
-                    <span>{log.message}</span>
+                    <DicomDiagnosticLink
+                      entry={log}
+                      onInspect={onInspectDicom}
+                    />
                   </div>
                 );
               })}
@@ -439,7 +498,7 @@ export default function DownloadSummaryView({
               onClick={onRetryFailed}
               variant="outline"
               size="sm"
-              className="gap-1 text-amber-500 border-amber-500/40 hover:bg-amber-500/10"
+              className="gap-1 border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
             >
               Retry Failed Files ({failedItems.length})
             </Button>
@@ -449,7 +508,7 @@ export default function DownloadSummaryView({
               onClick={onRetryAll}
               variant="outline"
               size="sm"
-              className="gap-1 text-amber-500 border-amber-500/40 hover:bg-amber-500/10"
+              className="gap-1 border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
             >
               Retry all files
             </Button>

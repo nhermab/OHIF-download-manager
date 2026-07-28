@@ -6,11 +6,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@ohif/ui-next';
 import { formatBytes, formatTransferSpeed } from '../utils';
+import DicomDiagnosticLink from './DicomDiagnosticLink';
 
 interface DownloadProgressViewProps {
   stats: any;
-  logs: Array<{ timestamp: string; message: string; type: string }>;
+  logs: Array<{
+    timestamp: string;
+    message: string;
+    type: string;
+    dicomDiagnostic?: any;
+  }>;
   onCancel: () => void;
+  onInspectDicom?: (diagnostic: any) => void;
   awaitingInput?: boolean;
   droppedLogCount?: number;
 }
@@ -26,6 +33,7 @@ export default function DownloadProgressView({
   stats,
   logs,
   onCancel,
+  onInspectDicom,
   awaitingInput = false,
   droppedLogCount = 0,
 }: DownloadProgressViewProps) {
@@ -80,7 +88,11 @@ export default function DownloadProgressView({
       if (isProblem) errors++;
       if (isSuccess) successes++;
 
-      if (logFilter === 'all' || (logFilter === 'errors' && isProblem) || (logFilter === 'success' && isSuccess)) {
+      if (
+        logFilter === 'all' ||
+        (logFilter === 'errors' && isProblem) ||
+        (logFilter === 'success' && isSuccess)
+      ) {
         filtered.push(log);
       }
     });
@@ -114,12 +126,10 @@ export default function DownloadProgressView({
               {completed} / {total} Files ({percent}%)
             </span>
             {stats?.failed > 0 && (
-              <span className="text-amber-500 text-xs font-medium">
-                ({stats.failed} failed)
-              </span>
+              <span className="text-xs font-medium text-amber-500">({stats.failed} failed)</span>
             )}
           </div>
-          <span className="text-muted-foreground block text-[11px] font-mono mt-0.5">
+          <span className="text-muted-foreground mt-0.5 block font-mono text-[11px]">
             {etaText}
           </span>
         </div>
@@ -145,7 +155,7 @@ export default function DownloadProgressView({
         <div
           className={`h-full rounded-full transition-all duration-300 ease-out ${
             awaitingInput
-              ? 'bg-amber-500/50 animate-pulse'
+              ? 'animate-pulse bg-amber-500/50'
               : stats?.failed > 0
                 ? 'bg-amber-500'
                 : 'bg-primary'
@@ -156,7 +166,7 @@ export default function DownloadProgressView({
 
       {/* Awaiting input / finalization phase banner */}
       {awaitingInput ? (
-        <div className="border-amber-500/40 bg-amber-500/10 text-foreground flex items-start gap-2 rounded border p-3 text-xs">
+        <div className="text-foreground flex items-start gap-2 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
           <span aria-hidden="true">⏸️</span>
           <span>
             <strong>Awaiting your input.</strong> The export is paused until you choose a redaction
@@ -209,7 +219,7 @@ export default function DownloadProgressView({
               type="button"
               onClick={() => setLogFilter('all')}
               aria-pressed={logFilter === 'all'}
-              className={`px-2 py-0.5 rounded text-[11px] ${
+              className={`rounded px-2 py-0.5 text-[11px] ${
                 logFilter === 'all'
                   ? 'bg-primary text-primary-foreground font-medium'
                   : 'text-muted-foreground hover:bg-primary/10'
@@ -221,9 +231,9 @@ export default function DownloadProgressView({
               type="button"
               onClick={() => setLogFilter('errors')}
               aria-pressed={logFilter === 'errors'}
-              className={`px-2 py-0.5 rounded text-[11px] ${
+              className={`rounded px-2 py-0.5 text-[11px] ${
                 logFilter === 'errors'
-                  ? 'bg-amber-500 text-white font-medium'
+                  ? 'bg-amber-500 font-medium text-white'
                   : 'text-muted-foreground hover:bg-amber-500/10'
               }`}
             >
@@ -233,9 +243,9 @@ export default function DownloadProgressView({
               type="button"
               onClick={() => setLogFilter('success')}
               aria-pressed={logFilter === 'success'}
-              className={`px-2 py-0.5 rounded text-[11px] ${
+              className={`rounded px-2 py-0.5 text-[11px] ${
                 logFilter === 'success'
-                  ? 'bg-emerald-500 text-white font-medium'
+                  ? 'bg-emerald-500 font-medium text-white'
                   : 'text-muted-foreground hover:bg-emerald-500/10'
               }`}
             >
@@ -247,7 +257,7 @@ export default function DownloadProgressView({
         <div
           ref={logContainerRef}
           onScroll={handleScroll}
-          className="border-input bg-background text-muted-foreground h-44 select-text space-y-1 overflow-y-auto rounded border p-2.5 font-mono text-xs relative"
+          className="border-input bg-background text-muted-foreground relative h-44 select-text space-y-1 overflow-y-auto rounded border p-2.5 font-mono text-xs"
         >
           {droppedLogCount > 0 && (
             <div className="text-muted-foreground italic">
@@ -272,7 +282,10 @@ export default function DownloadProgressView({
                   <span className="shrink-0 font-semibold">
                     {SEVERITY_LABEL[log.type] || SEVERITY_LABEL.info}
                   </span>
-                  <span>{log.message}</span>
+                  <DicomDiagnosticLink
+                    entry={log}
+                    onInspect={onInspectDicom}
+                  />
                 </div>
               );
             })
@@ -289,7 +302,7 @@ export default function DownloadProgressView({
                   logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
                 }
               }}
-              className="text-primary hover:underline text-[11px]"
+              className="text-primary text-[11px] hover:underline"
             >
               ↓ Scroll to bottom
             </button>
